@@ -1,0 +1,1917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance & Leave Statement Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <style>
+    /* Subheadings vertical placement for word-document matching */
+    .th-vert {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      text-align: center;
+      vertical-align: middle;
+      white-space: nowrap;
+      padding: 6px 2px !important;
+    }
+
+    /* Shared leave-line styling to guarantee straight alignment */
+    .leave-line {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 20px;
+      line-height: 20px;
+      margin-bottom: 2px;
+      box-sizing: border-box;
+    }
+    .leave-line:last-child {
+      margin-bottom: 0;
+    }
+    .mini-input {
+      height: 16px;
+      line-height: 16px;
+      padding: 0 2px;
+      box-sizing: border-box;
+    }
+
+    @page {
+      margin: 8mm 8mm 8mm 8mm;
+      margin-top: 4mm;
+      size: auto;
+    }
+
+    @media print {
+      body {
+        background-color: white !important;
+        padding: 0 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-hidden {
+        display: none !important;
+      }
+      #leaveTableSection, #academicLeaveTableSection, #tempLeaveTableSection {
+        display: block !important;
+      }
+      table {
+        font-size: 10px !important;
+        width: 100% !important;
+        border-collapse: collapse !important;
+      }
+      th, td {
+        padding: 4px 3px !important;
+        border: 1px solid #000 !important;
+      }
+      body, .max-w-6xl {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #leaveTableSection, #academicLeaveTableSection, #tempLeaveTableSection {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+        border-top: none !important;
+      }
+      #leaveTableSection > * + *, #academicLeaveTableSection > * + *, #tempLeaveTableSection > * + * {
+        margin-top: 0.5rem !important;
+      }
+      .p-6 {
+        padding: 0 !important;
+      }
+      #leaveTableSection .grid.grid-cols-3, #academicLeaveTableSection .grid.grid-cols-3, #tempLeaveTableSection .grid.grid-cols-3 {
+        padding-top: 0.75rem !important;
+        margin-top: 0.5rem !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      .overflow-x-auto {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
+      .edit-input {
+        border: none !important;
+        background: transparent !important;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        font-weight: bold !important;
+        color: #000 !important;
+        padding: 0 !important;
+      }
+    }
+  </style>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-analytics.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDb7Fq8Qdx5UAnf0gNw_CrnbNsyEH8kkAo",
+      authDomain: "leavemanagement-6f483.firebaseapp.com",
+      projectId: "leavemanagement-6f483",
+      storageBucket: "leavemanagement-6f483.firebasestorage.app",
+      messagingSenderId: "814810299806",
+      appId: "1:814810299806:web:a5be434e2280dbaa48aa8f",
+      measurementId: "G-YPWB22T4G5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db = getFirestore(app);
+
+    // Globally available database handlers
+    window.FirebaseDB = {
+      // SECTION 2: Non-Academic datastore
+      getBalances: async (docId) => {
+        try {
+          const docRef = doc(db, "monthly_leave_balances", docId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) return docSnap.data();
+          return null; 
+        } catch (e) {
+          console.error("Error fetching data:", e);
+          return null;
+        }
+      },
+      saveBalances: async (docId, data) => {
+        try {
+          await setDoc(doc(db, "monthly_leave_balances", docId), data);
+          return true;
+        } catch (e) {
+          console.error("Error saving data:", e);
+          return false;
+        }
+      },
+      // SECTION 3: Academic datastore
+      getAcademicBalances: async (docId) => {
+        try {
+          const docRef = doc(db, "monthly_leave_balances_academic", docId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) return docSnap.data();
+          return null; 
+        } catch (e) {
+          console.error("Error fetching academic data:", e);
+          return null;
+        }
+      },
+      saveAcademicBalances: async (docId, data) => {
+        try {
+          await setDoc(doc(db, "monthly_leave_balances_academic", docId), data);
+          return true;
+        } catch (e) {
+          console.error("Error saving academic data:", e);
+          return false;
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-slate-100 min-h-screen font-sans py-8 px-4">
+
+  <div class="max-w-6xl mx-auto space-y-8">
+    
+    <!-- SECTION 1: FINGERPRINT ATTENDANCE SPLITTER -->
+    <div id="section1" class="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden no-print">
+      <div class="bg-slate-800 text-white p-6">
+        <h1 class="text-2xl font-bold">1. Fingerprint Attendance PDF Splitter</h1>
+        <p class="text-slate-300 text-sm mt-1">Upload attendance PDF & Excel to extract individual files directly to your Desktop folder.</p>
+      </div>
+      <div class="p-6 space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="border-2 border-dashed border-slate-300 rounded-lg p-5 text-center hover:border-indigo-500 transition-colors">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">1. Multi-Page Attendance PDF</label>
+            <input type="file" id="pdfInput" accept=".pdf" class="text-xs text-slate-500 w-full cursor-pointer">
+          </div>
+          <div class="border-2 border-dashed border-slate-300 rounded-lg p-5 text-center hover:border-indigo-500 transition-colors">
+            <label class="block text-sm font-semibold text-slate-700 mb-1">2. Staff List Excel (.xlsx / .xls)</label>
+            <input type="file" id="excelInput" accept=".xlsx, .xls" class="text-xs text-slate-500 w-full cursor-pointer">
+            <p class="text-[10px] text-slate-400 mt-1">Excel-ல் Name, Emp ID, Email columns வேணும்</p>
+          </div>
+        </div>
+        <div class="border border-slate-200 rounded-lg p-3 bg-slate-50">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">⚙️ Google Apps Script Web App URL (ஒரே தடவை setup)</label>
+          <input type="text" id="gasUrlInput" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec" class="w-full text-xs border border-slate-300 rounded px-2 py-1.5">
+          <p class="text-[10px] text-slate-400 mt-1">இங்க paste பண்ணி வச்சா, browser-ல் நினைவு வச்சிருக்கும். மறுபடியும் தேவையில்ல.</p>
+        </div>
+        <button id="processBtn" onclick="processFiles()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition-colors">
+          Process & Extract Individual PDFs
+        </button>
+        <div id="progressSection" class="hidden space-y-2">
+          <div class="flex justify-between text-xs font-semibold text-slate-600">
+            <span id="progressStatus">Reading files...</span>
+            <span id="progressPercent">0%</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+            <div id="progressBar" class="bg-indigo-600 h-3 rounded-full transition-all duration-200" style="width: 0%"></div>
+          </div>
+        </div>
+        <div id="resultsSection" class="hidden space-y-4 pt-4 border-t border-slate-200">
+          <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg p-4 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 class="font-bold text-sm">Processing Complete!</h3>
+              <p id="successSummary" class="text-xs mt-1">Matched 0 staff members.</p>
+            </div>
+            <div class="flex gap-2">
+              <button id="downloadZipBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 px-4 rounded-md shadow">
+                Download Backup ZIP
+              </button>
+              <button id="uploadDriveBtn" onclick="uploadAllToDrive()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-md shadow">
+                ☁️ Upload All to Google Drive
+              </button>
+            </div>
+          </div>
+          <div id="unmappedBox" class="hidden bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-4">
+            <h4 class="font-bold text-sm text-amber-800">Staff Not Found (<span id="unmappedCount">0</span>)</h4>
+            <ul id="unmappedList" class="list-disc pl-5 text-xs space-y-1 max-h-36 overflow-y-auto"></ul>
+          </div>
+          <div id="matchedListBox" class="hidden bg-white border border-slate-200 rounded-lg p-4">
+            <div class="flex justify-between items-center mb-2">
+              <h4 class="font-bold text-sm text-slate-700">Matched Staff — Send PDF by Email</h4>
+              <button id="sendAllEmailsBtn" onclick="sendAllEmails()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-2 px-3 rounded shadow">
+                📧 Send Email to All
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs border-collapse border border-slate-300">
+                <thead class="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th class="p-2 border border-slate-300 text-left">Name</th>
+                    <th class="p-2 border border-slate-300 text-left">Email</th>
+                    <th class="p-2 border border-slate-300 text-center">Status</th>
+                    <th class="p-2 border border-slate-300 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="matchedListBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: NON ACADEMIC LEAVE GENERATOR -->
+    <div id="section2" class="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden p-6 space-y-6">
+      <div class="no-print space-y-2">
+        <h2 class="text-2xl font-bold text-teal-800">2. Monthly Leave Statement Generator - Non Academic Staff </h2>
+        <p class="text-slate-600 text-sm">Extracts AB/ABH leaves from PDF, applies deduction rules, and formats matching Word document layout exactly.<b>(Once the HOD signs, click 'Save balances to Database'.)</b></p>
+        <div class="flex gap-2">
+          <button id="generateReportBtn" onclick="generateLeaveStatement()" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition-colors">
+            Generate Monthly Leave Report
+          </button>
+          <button onclick="saveCurrentBalancesToFirebase()" id="saveFirebaseBtn" class="hidden flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition-colors">
+            💾 Save Balances to Database
+          </button>
+          <button onclick="toggleDebugPanel()" class="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition-colors whitespace-nowrap">
+            🔍 Show Raw PDF Text
+          </button>
+        </div>
+        <div id="debugPanel" class="hidden bg-slate-900 text-emerald-300 rounded-lg p-4 space-y-4 max-h-[600px] overflow-y-auto">
+          <div class="flex justify-between items-center">
+            <h3 class="text-white font-bold text-sm">Debug: Raw Extracted Text Per Matched Staff</h3>
+            <button onclick="copyDebugText()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs px-3 py-1 rounded">Copy All</button>
+          </div>
+          <p class="text-slate-400 text-xs">This shows exactly what the PDF parser sees for each staff member's page, line-by-line, plus what dates/leaves it parsed out.</p>
+          <pre id="debugOutput" class="text-xs whitespace-pre-wrap leading-relaxed"></pre>
+        </div>
+      </div>
+
+      <div id="leaveTableSection" class="hidden space-y-6 pt-4 border-t border-slate-200">
+        <div class="flex justify-between items-center no-print">
+          <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded border border-emerald-200">Report Generated Successfully</span>
+          <button onclick="printSection('section2')" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-4 py-2 rounded shadow">
+            🖨️ Print Report
+          </button>
+        </div>
+
+        <div class="text-center font-bold text-slate-800 space-y-3">
+          <h2 class="text-xl underline">Monthly Leave Statement</h2>
+          <div class="flex justify-between text-xs font-semibold gap-2 pt-1 text-slate-900">
+            <div class="border border-black px-3 py-1 bg-white">
+              Month: <span id="metaMonth">July</span>
+            </div>
+            <div class="border border-black px-3 py-1 bg-white">
+              Year: <span id="metaYear">2026</span>
+            </div>
+            <div class="border border-black px-3 py-1 bg-white">
+              Faculty / Branch: <span>Computer Unit, University of Jaffna</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse border border-black">
+            <thead class="bg-slate-50 text-slate-900 font-bold">
+              <tr>
+                <th class="p-1 border border-black text-center" rowspan="2">No</th>
+                <th class="p-1 border border-black text-center" rowspan="2">Emp. No</th>
+                <th class="p-1 border border-black text-center" rowspan="2">Name</th>
+                <th class="p-1 border border-black text-center" rowspan="2">Designation</th>
+                <th class="p-1 border border-black text-center" rowspan="2">Department</th>
+                <th class="p-1 border border-black text-center" colspan="2">Leave Date</th>
+                <th class="p-1 border border-black text-center" colspan="5">Leave Taken</th>
+                <th class="p-1 border border-black text-center" colspan="4">Leave Available</th>
+                <th class="p-1 border border-black text-center" rowspan="2">Remarks</th>
+              </tr>
+              <tr>
+                <th class="p-1 border border-black text-center">From</th>
+                <th class="p-1 border border-black text-center">To</th>
+                <th class="border border-black th-vert">Casual(21)</th>
+                <th class="border border-black th-vert">Vacation(24)</th>
+                <th class="border border-black th-vert">Study</th>
+                <th class="border border-black th-vert">Paid</th>
+                <th class="border border-black th-vert">No Pay</th>
+                <th class="border border-black th-vert">Casual</th>
+                <th class="border border-black th-vert">Vacation</th>
+                <th class="border border-black th-vert">Study</th>
+                <th class="border border-black th-vert">Paid</th>
+              </tr>
+            </thead>
+            <tbody id="leaveTableBody" class="divide-y divide-black text-slate-900"></tbody>
+          </table>
+        </div>
+
+        <div class="pt-16 pb-4 grid grid-cols-3 gap-4 text-xs font-semibold text-slate-900">
+          <div>Prepared by: ………………………………</div>
+          <div>Checked by: ………………………………</div>
+          <div class="text-right">…………………………………<br>Head / Computer Unit</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 3: ACADEMIC STAFF (PERMANENT) -->
+    <div id="section3" class="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden p-6 space-y-6">
+      <div class="no-print space-y-2">
+        <h2 class="text-2xl font-bold text-indigo-800">3. Monthly Leave Statement Generator - Academic Staff (Permanent)</h2>
+        <p class="text-slate-600 text-sm">First 4 persons pre-filled from Word document (editable); subsequent staff extracted automatically from PDF via Firebase balance tracking.<b>(Once the HOD signs, click 'Save balances to Database'.)</b></p>
+        <div class="flex gap-2">
+          <button id="generateAcademicReportBtn" onclick="generateAcademicLeaveStatement()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition-colors">
+            Generate Academic Leave Report
+          </button>
+          <button onclick="saveAcademicBalancesToFirebase()" id="saveAcademicFirebaseBtn" class="hidden flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition-colors">
+            💾 Save Academic Balances
+          </button>
+          <button onclick="toggleAcademicDebugPanel()" class="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition-colors whitespace-nowrap">
+            🔍 Show Raw PDF Text
+          </button>
+        </div>
+        <div id="academicDebugPanel" class="hidden bg-slate-900 text-emerald-300 rounded-lg p-4 space-y-4 max-h-[600px] overflow-y-auto">
+          <div class="flex justify-between items-center">
+            <h3 class="text-white font-bold text-sm">Debug: Raw Extracted Text Per Matched Academic Staff</h3>
+            <button onclick="copyAcademicDebugText()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs px-3 py-1 rounded">Copy All</button>
+          </div>
+          <pre id="academicDebugOutput" class="text-xs whitespace-pre-wrap leading-relaxed"></pre>
+        </div>
+      </div>
+
+      <div id="academicLeaveTableSection" class="hidden space-y-6 pt-4 border-t border-slate-200">
+        <div class="flex justify-between items-center no-print">
+          <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 px-3 py-1 rounded border border-indigo-200">Academic Report Generated Successfully</span>
+          <button onclick="printSection('section3')" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-4 py-2 rounded shadow">
+            🖨️ Print Report
+          </button>
+        </div>
+
+        <div class="text-center font-bold text-slate-800 space-y-3">
+          <h2 class="text-xl underline">Monthly Leave Statement</h2>
+          <div class="flex justify-between text-xs font-semibold gap-2 pt-1 text-slate-900">
+            <div class="border border-black px-3 py-1 bg-white">Month: <span id="metaAcademicMonth">July</span></div>
+            <div class="border border-black px-3 py-1 bg-white">Year: <span id="metaAcademicYear">2026</span></div>
+            <div class="border border-black px-3 py-1 bg-white">Faculty / Branch: <span>Computer Unit, University of Jaffna</span></div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left border-collapse border border-black">
+            <thead class="bg-slate-50 text-slate-900 font-bold">
+              <tr>
+                <th class="p-1 border border-black text-center" rowspan="2">No</th>
+                <th class="p-1 border border-black text-center" rowspan="2">Emp. No</th>
+                <th class="p-1 border border-black text-center" rowspan="2">Name</th>
+                <th class="p-1 border border-black text-center" rowspan="2">Designation</th>
+                <th class="p-1 border border-black text-center" rowspan="2">Department</th>
+                <th class="p-1 border border-black text-center" colspan="2">Leave Date</th>
+                <th class="p-1 border border-black text-center" colspan="5">Leave Taken</th>
+                <th class="p-1 border border-black text-center" colspan="4">Leave Available</th>
+                <th class="p-1 border border-black text-center" rowspan="2">Remarks</th>
+              </tr>
+              <tr>
+                <th class="p-1 border border-black text-center">From</th>
+                <th class="p-1 border border-black text-center">To</th>
+                <th class="border border-black th-vert">Casual(21)</th>
+                <th class="border border-black th-vert">Vacation(24)</th>
+                <th class="border border-black th-vert">Study</th>
+                <th class="border border-black th-vert">Paid</th>
+                <th class="border border-black th-vert">No Pay</th>
+                <th class="border border-black th-vert">Casual</th>
+                <th class="border border-black th-vert">Vacation</th>
+                <th class="border border-black th-vert">Study</th>
+                <th class="border border-black th-vert">Paid</th>
+              </tr>
+            </thead>
+            <tbody id="academicLeaveTableBody" class="divide-y divide-black text-slate-900"></tbody>
+          </table>
+        </div>
+
+        <div class="pt-16 pb-4 grid grid-cols-3 gap-4 text-xs font-semibold text-slate-900">
+          <div>Prepared by: ………………………………</div>
+          <div>Checked by: ………………………………</div>
+          <div class="text-right">…………………………………<br>Head / Computer Unit</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- SECTION 4: ACADEMIC STAFF (TEMPORARY) -->
+    <div id="section4" class="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden p-6 space-y-6 mb-8 relative">
+      <div class="no-print space-y-2">
+        <h2 class="text-2xl font-bold text-orange-800">4. Monthly Leave Statement Generator - Academic Staff (Temporary)</h2>
+        <p class="text-slate-600 text-sm">Extracts Casual leaves from PDF for temporary academic staff. Does not manage or store balances. You can add or remove members seamlessly (changes are permanently saved in your browser).</p>
+        <div class="flex gap-2">
+          <button id="generateTempReportBtn" onclick="generateTempLeaveStatement()" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-lg shadow transition-colors">
+            Generate Temporary Staff Report
+          </button>
+        </div>
+      </div>
+
+      <div id="tempLeaveTableSection" class="hidden space-y-6 pt-4 border-t border-slate-200">
+        <div class="flex justify-between items-center no-print">
+          <span class="text-xs font-semibold text-orange-700 bg-orange-50 px-3 py-1 rounded border border-orange-200">Temporary Report Generated Successfully</span>
+          <button onclick="printSection('section4')" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-4 py-2 rounded shadow">
+            🖨️ Print Report
+          </button>
+        </div>
+
+        <div class="text-center font-bold text-slate-800 space-y-3">
+          <h2 class="text-xl underline">Monthly Leave Statement</h2>
+          <div class="flex justify-between text-xs font-semibold gap-2 pt-1 text-slate-900">
+            <div class="border border-black px-3 py-1 bg-white">Month: <span id="metaTempMonth">July</span></div>
+            <div class="border border-black px-3 py-1 bg-white">Year: <span id="metaTempYear">2026</span></div>
+            <div class="border border-black px-3 py-1 bg-white">Faculty / Branch: <span>Computer Unit, University of Jaffna</span></div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto pb-4">
+          <table class="w-full text-xs text-left border-collapse border border-black">
+            <thead class="bg-slate-50 text-slate-900 font-bold">
+              <tr>
+                <th class="p-1 border border-black text-center" rowspan="2">No</th>
+                <th class="p-1 border border-black text-center min-w-[220px]" rowspan="2">Name</th>
+                <th class="p-1 border border-black text-center w-28" rowspan="2">Designation</th>
+                <th class="p-1 border border-black text-center w-24" rowspan="2">Department</th>
+                <th class="p-1 border border-black text-center" colspan="2">Leave Date</th>
+                <th class="p-1 border border-black text-center" colspan="5">Leave Taken</th>
+                <th class="p-1 border border-black text-center" colspan="4">Leave Available</th>
+                <th class="p-1 border border-black text-center" rowspan="2">Remarks</th>
+              </tr>
+              <tr>
+                <th class="p-1 border border-black text-center">From</th>
+                <th class="p-1 border border-black text-center">To</th>
+                <th class="border border-black th-vert">Casual</th>
+                <th class="border border-black th-vert">Vacation</th>
+                <th class="border border-black th-vert">Study</th>
+                <th class="border border-black th-vert">Paid</th>
+                <th class="border border-black th-vert">No Pay</th>
+                <th class="border border-black th-vert">Casual</th>
+                <th class="border border-black th-vert">Vacation</th>
+                <th class="border border-black th-vert">Study</th>
+                <th class="border border-black th-vert">Paid</th>
+              </tr>
+            </thead>
+            <tbody id="tempLeaveTableBody" class="divide-y divide-black text-slate-900"></tbody>
+          </table>
+          
+          <div class="mt-3 no-print text-center">
+            <button onclick="openTempStaffModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs px-4 py-2 font-bold rounded shadow transition-colors">+ Add Staff Member</button>
+          </div>
+        </div>
+
+        <div class="pt-16 pb-4 grid grid-cols-3 gap-4 text-xs font-semibold text-slate-900">
+          <div>Prepared by: ………………………………</div>
+          <div>Checked by: ………………………………</div>
+          <div class="text-right">…………………………………<br>Head / Computer Unit</div>
+        </div>
+      </div>
+
+      <!-- ADD STAFF MODAL (SECTION 4) -->
+      <div id="addTempStaffModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-96 space-y-4 shadow-2xl border border-slate-300">
+          <h3 class="text-lg font-bold text-slate-800 border-b pb-2">Add Temporary Staff</h3>
+          
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">1. Name to the report list</label>
+            <input type="text" id="newTempName" class="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-orange-500" placeholder="e.g. Mr. John Doe">
+          </div>
+          
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-500">
+            <strong>Match settings:</strong> Provide one or both of the below to extract the fingerprint record accurately.
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">2. Name as per finger report (pdfName)</label>
+            <input type="text" id="newTempPdfName" class="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-orange-500" placeholder="e.g. Mr. J. Doe">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">3. Employee ID (Optional, high priority match)</label>
+            <input type="text" id="newTempEmpId" class="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-orange-500" placeholder="e.g. 05207">
+          </div>
+
+          <div class="flex justify-end gap-2 pt-3 border-t mt-2">
+            <button onclick="closeTempStaffModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 text-sm font-semibold px-4 py-2 rounded transition-colors">Cancel</button>
+            <button onclick="saveNewTempStaff()" class="bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold px-4 py-2 rounded shadow transition-colors">Add Member</button>
+          </div>
+        </div>
+      </div>
+      <!-- END ADD STAFF MODAL -->
+
+    </div>
+  </div>
+
+  <script>
+    // --- HELPER MATCHING FUNCTION ---
+    // Enforces word boundaries so "Mr. S. Tharsan" will NOT match "Mr. S. Tharsana"
+    function isStrictNameMatch(text, pdfName) {
+      if (!pdfName) return false;
+      const escaped = pdfName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`\\b${escaped}\\b`, 'i').test(text);
+    }
+
+    // --- SECTION 1 SCRIPT ---
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const MONTH_NAMES = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    // Google Apps Script Web App URL - saved in this browser only
+    const gasUrlInputEl = document.getElementById('gasUrlInput');
+    gasUrlInputEl.value = localStorage.getItem('gasWebAppUrl') || '';
+    gasUrlInputEl.addEventListener('change', () => {
+      localStorage.setItem('gasWebAppUrl', gasUrlInputEl.value.trim());
+    });
+    function getGasUrl() {
+      const url = (document.getElementById('gasUrlInput').value || '').trim();
+      if (!url) alert('முதலில் Google Apps Script Web App URL-ஐ மேலே உள்ள பெட்டியில் பேஸ்ட் பண்ணுங்க.');
+      return url;
+    }
+
+    let SECTION1_RESULTS = []; // { name, id, email, fileName, base64 }
+    let SECTION1_MONTH_FOLDER = '';
+
+    function arrayBufferToBase64(bytes) {
+      let binary = '';
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+      }
+      return btoa(binary);
+    }
+
+    // University/office WiFi sometimes drops a request mid-flight (shows as
+    // "Failed to fetch" - a browser network error, not a script error). This
+    // retries a couple of times with a short pause before giving up for real.
+    async function fetchWithRetry(url, options, retries = 2, delayMs = 1500) {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          return await fetch(url, options);
+        } catch (networkErr) {
+          if (attempt === retries) throw networkErr;
+          await new Promise(res => setTimeout(res, delayMs));
+        }
+      }
+    }
+
+    // Reads the raw response text first (instead of resp.json() directly) so that
+    // if Apps Script returns HTML instead of JSON, we can show the ACTUAL message
+    // instead of a generic "Unexpected token '<'" parse error.
+    async function parseGasResponse(resp) {
+      const rawText = await resp.text();
+      console.log('GAS raw response (status ' + resp.status + '):', rawText);
+      try {
+        return JSON.parse(rawText);
+      } catch (parseErr) {
+        // Your university/office network's security proxy sometimes blocks the
+        // confirmation page that Google Apps Script redirects to AFTER it has
+        // already run doPost (upload/email already happened by this point).
+        // This proxy's own block page contains this distinct fingerprint, so we
+        // detect it and treat the action as having succeeded rather than failed.
+        const isNetworkFilterPage = /ppConfig|periodicReportingRateMillis|disableAllReporting/i.test(rawText);
+        if (isNetworkFilterPage) {
+          return { success: true, note: 'network-filter-blocked-confirmation' };
+        }
+        const snippet = rawText.replace(/\s+/g, ' ').trim().substring(0, 300);
+        throw new Error(`HTTP ${resp.status} - Server JSON இல்ல, இது வந்தது: ${snippet}`);
+      }
+    }
+
+    async function processFiles() {
+      const pdfFileInput = document.getElementById('pdfInput').files[0];
+      const excelFileInput = document.getElementById('excelInput').files[0];
+
+      if (!pdfFileInput || !excelFileInput) {
+        alert('Please select both the multi-page PDF file and the Excel file.');
+        return;
+      }
+
+      const pdfFileName = pdfFileInput.name;
+      let detectedMonthFolder = extractMonthFromFileName(pdfFileName);
+      SECTION1_MONTH_FOLDER = detectedMonthFolder;
+      SECTION1_RESULTS = [];
+
+      const processBtn = document.getElementById('processBtn');
+      const progressSection = document.getElementById('progressSection');
+      const resultsSection = document.getElementById('resultsSection');
+      const unmappedBox = document.getElementById('unmappedBox');
+      const unmappedList = document.getElementById('unmappedList');
+
+      processBtn.disabled = true;
+      processBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      progressSection.classList.remove('hidden');
+      resultsSection.classList.add('hidden');
+      unmappedBox.classList.add('hidden');
+      unmappedList.innerHTML = '';
+      updateProgress(0, 'Reading Excel file...');
+
+      try {
+        const excelBuffer = await excelFileInput.arrayBuffer();
+        const workbook = XLSX.read(excelBuffer, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(firstSheet);
+
+        const staffList = rows.map(row => {
+          const keys = Object.keys(row);
+          const nameKey = keys.find(k => /name|staff|employee/i.test(k)) || keys[0];
+          const idKey = keys.find(k => /id|code|emp_id/i.test(k));
+          const emailKey = keys.find(k => /email|mail/i.test(k));
+          return {
+            name: String(row[nameKey] || '').trim(),
+            id: idKey ? String(row[idKey] || '').trim() : '',
+            email: emailKey ? String(row[emailKey] || '').trim() : ''
+          };
+        }).filter(s => s.name.length > 0);
+
+        if (staffList.length === 0) throw new Error('No staff names found in Excel.');
+
+        updateProgress(10, 'Loading PDF file...');
+        const masterPdfBuffer = await pdfFileInput.arrayBuffer();
+
+        const pdfJsDoc = await pdfjsLib.getDocument({ data: masterPdfBuffer.slice(0) }).promise;
+        const totalPages = pdfJsDoc.numPages;
+        const pageTexts = [];
+
+        for (let i = 1; i <= totalPages; i++) {
+          const page = await pdfJsDoc.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageString = textContent.items.map(item => item.str).join(' ');
+          
+          pageTexts.push({ pageNum: i, cleanText: normalizeText(pageString) });
+          updateProgress(Math.round(10 + (i / totalPages) * 40), `Extracting page text (${i}/${totalPages})...`);
+        }
+
+        updateProgress(50, `Matching staff names...`);
+        const sourcePdfDoc = await PDFLib.PDFDocument.load(masterPdfBuffer);
+        const zip = new JSZip();
+        const monthZipFolder = zip.folder(detectedMonthFolder);
+
+        let matchedCount = 0;
+        const unmappedStaff = [];
+
+        for (let idx = 0; idx < staffList.length; idx++) {
+          const staff = staffList[idx];
+          const matchedPage = pageTexts.find(p => p.cleanText.includes(normalizeText(staff.name)));
+
+          if (matchedPage) {
+            matchedCount++;
+            const newPdf = await PDFLib.PDFDocument.create();
+            const [copiedPage] = await newPdf.copyPages(sourcePdfDoc, [matchedPage.pageNum - 1]);
+            newPdf.addPage(copiedPage);
+
+            const pdfBytes = await newPdf.save();
+            const safeFileName = sanitizeFileName(staff.name, staff.id);
+
+            monthZipFolder.file(safeFileName, pdfBytes);
+
+            SECTION1_RESULTS.push({
+              name: staff.name,
+              id: staff.id,
+              email: staff.email || '',
+              fileName: safeFileName,
+              base64: arrayBufferToBase64(pdfBytes)
+            });
+          } else {
+            unmappedStaff.push(staff.name);
+          }
+          updateProgress(Math.round(50 + ((idx + 1) / staffList.length) * 40), `Generating PDFs...`);
+        }
+
+        updateProgress(95, 'Finalizing ZIP...');
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+        document.getElementById('downloadZipBtn').onclick = () => {
+          const url = URL.createObjectURL(zipBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${detectedMonthFolder}_Attendance.zip`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+
+        document.getElementById('successSummary').textContent = `Successfully extracted ${matchedCount} PDFs for "${detectedMonthFolder}".`;
+
+        if (unmappedStaff.length > 0) {
+          document.getElementById('unmappedCount').textContent = unmappedStaff.length;
+          unmappedStaff.forEach(name => {
+            const li = document.createElement('li');
+            li.textContent = name;
+            unmappedList.appendChild(li);
+          });
+          unmappedBox.classList.remove('hidden');
+        }
+
+        renderMatchedList();
+
+        updateProgress(100, 'Done!');
+        resultsSection.classList.remove('hidden');
+
+      } catch (err) {
+        alert('Error: ' + err.message);
+      } finally {
+        processBtn.disabled = false;
+        processBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      }
+    }
+
+    function extractMonthFromFileName(fileName) {
+      for (const month of MONTH_NAMES) {
+        if (new RegExp('\\b' + month + '\\b', 'i').test(fileName)) {
+          return `${month} ${new Date().getFullYear()}`;
+        }
+      }
+      return `${MONTH_NAMES[new Date().getMonth()]} ${new Date().getFullYear()}`;
+    }
+
+    function normalizeText(text) { return text.toLowerCase().replace(/[^a-z0-9]/g, ''); }
+    function sanitizeFileName(name, id) {
+      const cleanName = name.trim().replace(/[\/\\?%*:|"<>]/g, '').replace(/\s+/g, '_');
+      return `${cleanName}${id ? '_' + id.trim() : ''}.pdf`;
+    }
+    function updateProgress(percent, statusText) {
+      document.getElementById('progressBar').style.width = percent + '%';
+      document.getElementById('progressPercent').textContent = percent + '%';
+      document.getElementById('progressStatus').textContent = statusText;
+    }
+
+    // --- MATCHED LIST / DRIVE UPLOAD / EMAIL SENDING ---
+    function renderMatchedList() {
+      const box = document.getElementById('matchedListBox');
+      const body = document.getElementById('matchedListBody');
+      body.innerHTML = '';
+
+      if (SECTION1_RESULTS.length === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+
+      SECTION1_RESULTS.forEach((rec, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="p-2 border border-slate-300">${rec.name}</td>
+          <td class="p-2 border border-slate-300">${rec.email ? rec.email : '<span class="text-red-500">Email இல்லை</span>'}</td>
+          <td id="status-${idx}" class="p-2 border border-slate-300 text-center text-slate-500">Pending</td>
+          <td class="p-2 border border-slate-300 text-center">
+            <button id="sendBtn-${idx}" onclick="sendSingleEmail(${idx})" ${rec.email ? '' : 'disabled'}
+              class="bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-[10px] font-semibold py-1 px-2 rounded">
+              📧 Send
+            </button>
+          </td>`;
+        body.appendChild(tr);
+      });
+
+      box.classList.remove('hidden');
+    }
+
+    async function uploadAllToDrive() {
+      const gasUrl = getGasUrl();
+      if (!gasUrl) return;
+      if (SECTION1_RESULTS.length === 0) { alert('முதலில் Process பண்ணி PDF-களை உருவாக்குங்க.'); return; }
+
+      const btn = document.getElementById('uploadDriveBtn');
+      btn.disabled = true;
+      const originalText = btn.textContent;
+
+      let successCount = 0;
+      let filteredCount = 0;
+      const failedNames = [];
+
+      for (let i = 0; i < SECTION1_RESULTS.length; i++) {
+        const rec = SECTION1_RESULTS[i];
+        btn.textContent = `Uploading ${i + 1}/${SECTION1_RESULTS.length}...`;
+        try {
+          const resp = await fetchWithRetry(gasUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // simple request - avoids CORS preflight
+            body: JSON.stringify({
+              action: 'uploadToDrive',
+              month: SECTION1_MONTH_FOLDER,
+              fileName: rec.fileName,
+              fileBase64: rec.base64
+            })
+          });
+          const result = await parseGasResponse(resp);
+          if (!result.success) throw new Error(result.error || 'Unknown error');
+          successCount++;
+          if (result.note === 'network-filter-blocked-confirmation') filteredCount++;
+        } catch (err) {
+          failedNames.push(`${rec.name} (${err.message})`);
+        }
+      }
+
+      btn.disabled = false;
+      btn.textContent = originalText;
+
+      let summary = `Google Drive upload முடிந்தது.\n✅ Success: ${successCount}/${SECTION1_RESULTS.length}`;
+      if (filteredCount > 0) {
+        summary += `\n(இதில் ${filteredCount} பேருக்கு network filter confirmation-ஐ block பண்ணிருந்தாலும், upload வெற்றியா முடிஞ்சிருக்கு)`;
+      }
+      if (failedNames.length > 0) {
+        summary += `\n\n❌ உண்மையிலயே Failed:\n${failedNames.join('\n')}`;
+      }
+      alert(summary);
+    }
+
+    async function sendSingleEmail(idx) {
+      const gasUrl = getGasUrl();
+      if (!gasUrl) return;
+      const rec = SECTION1_RESULTS[idx];
+      if (!rec.email) { alert(`${rec.name} - Excel-ல் Email இல்லை.`); return; }
+
+      const btn = document.getElementById(`sendBtn-${idx}`);
+      const statusCell = document.getElementById(`status-${idx}`);
+      btn.disabled = true;
+      btn.textContent = '...';
+      statusCell.textContent = 'Sending...';
+
+      try {
+        const resp = await fetch(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'sendEmail',
+            email: rec.email,
+            fileName: rec.fileName,
+            fileBase64: rec.base64,
+            subject: `Monthly Attendance / Leave Statement - ${SECTION1_MONTH_FOLDER}`,
+            body: `Dear ${rec.name},\n\nஉங்களுடைய ${SECTION1_MONTH_FOLDER} மாத Attendance / Leave Statement இணைக்கப்பட்டுள்ளது.\n\nநன்றி,\nComputer Unit, University of Jaffna`
+          })
+        });
+        const result = await parseGasResponse(resp);
+        if (!result.success) throw new Error(result.error || 'Unknown error');
+        if (result.note === 'network-filter-blocked-confirmation') {
+          statusCell.textContent = '✅ Sent (network confirm blocked)';
+          statusCell.title = 'Network filter blocked Google\'s confirmation page, but the action itself completed - verify in Gmail/Drive if unsure.';
+        } else {
+          statusCell.textContent = '✅ Sent';
+        }
+        statusCell.className = 'p-2 border border-slate-300 text-center text-emerald-600 font-semibold';
+        btn.textContent = 'Resend';
+      } catch (err) {
+        statusCell.textContent = '❌ Failed';
+        statusCell.className = 'p-2 border border-slate-300 text-center text-red-600 font-semibold';
+        btn.textContent = '📧 Send';
+        alert(`${rec.name} - Email அனுப்ப முடியல: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function sendAllEmails() {
+      const gasUrl = getGasUrl();
+      if (!gasUrl) return;
+      if (SECTION1_RESULTS.length === 0) { alert('முதலில் Process பண்ணுங்க.'); return; }
+
+      const btn = document.getElementById('sendAllEmailsBtn');
+      btn.disabled = true;
+
+      for (let i = 0; i < SECTION1_RESULTS.length; i++) {
+        if (SECTION1_RESULTS[i].email) {
+          btn.textContent = `Sending ${i + 1}/${SECTION1_RESULTS.length}...`;
+          await sendSingleEmail(i);
+        }
+      }
+
+      btn.disabled = false;
+      btn.textContent = '📧 Send Email to All';
+      alert('அனைத்து Staff-க்கும் Email அனுப்பும் process முடிந்தது!');
+    }
+
+    // --- SECTION 2 SCRIPT (Non-Academic) ---
+    let WORD_DOC_STAFF_LIST = [
+      { no: "01", empNo: "05207", name: "Mr. Arasanayagam Jeyakanth", designation: "Technical Officer", department: "Computer Unit", casualAvail: 9.5, vacationAvail: 24 },
+      { no: "02", empNo: "05222", name: "Mr. Arumainayagam Kokulan", designation: "Technical Officer", department: "Computer Unit", casualAvail: 7.5, vacationAvail: 24 },
+      { no: "03", empNo: "07651", name: "Mr. Punniymoorthy Mayuran", designation: "Technical Officer(ICT)", department: "Computer Unit", casualAvail: 3, vacationAvail: 24 },
+      { no: "04", empNo: "04693", name: "Mr. Suppaiah Suthakaran", designation: "Laboratory Attendant", department: "Computer Unit", casualAvail: 11.5, vacationAvail: 23 },
+      { no: "05", empNo: "00426", name: "Mr. Kasippillai Sathiyakumar", designation: "Laboratory Attendant", department: "Computer Unit", casualAvail: 16, vacationAvail: 24 },
+      { no: "06", empNo: "05964", name: "Mr. Kanakathambirasa Manalan", designation: "Laboratory Attendant", department: "Computer Unit", casualAvail: 11, vacationAvail: 24 },
+      { no: "07", empNo: "04675", name: "Mr. Pulenthiran Jeyakaran", designation: "Works Aide", department: "Computer Unit", casualAvail: 0.5, vacationAvail: 19.5 }
+    ];
+
+    function getPreviousMonthStr(currentMonthStr, currentYear) {
+      const idx = MONTH_NAMES.findIndex(m => m.toLowerCase() === currentMonthStr.toLowerCase());
+      if (idx === 0) return { month: MONTH_NAMES[11], year: currentYear - 1 };
+      if (idx === -1) return { month: MONTH_NAMES[new Date().getMonth() - 1], year: currentYear };
+      return { month: MONTH_NAMES[idx - 1], year: currentYear };
+    }
+
+    async function generateLeaveStatement() {
+      const pdfFileInput = document.getElementById('pdfInput').files[0];
+
+      if (!pdfFileInput) {
+        alert('Please upload Section 1 Multi-Page Attendance PDF first!');
+        return;
+      }
+
+      const generateBtn = document.getElementById('generateReportBtn');
+      generateBtn.innerText = "Processing & Fetching DB...";
+      generateBtn.disabled = true;
+
+      const uploadFileName = pdfFileInput.name;
+      const detectedMonth = extractMonthNameOnly(uploadFileName);
+      const currentYear = new Date().getFullYear();
+
+      if (window.FirebaseDB) {
+        const prevTime = getPreviousMonthStr(detectedMonth, currentYear);
+        const prevDocId = `${prevTime.year}_${prevTime.month}`;
+        const prevData = await window.FirebaseDB.getBalances(prevDocId);
+        
+        if (prevData) {
+          WORD_DOC_STAFF_LIST = WORD_DOC_STAFF_LIST.map(staff => {
+             if (prevData[staff.empNo]) {
+                staff.casualAvail = prevData[staff.empNo].casualAvail;
+                staff.vacationAvail = prevData[staff.empNo].vacationAvail;
+             }
+             return staff;
+          });
+        }
+      }
+
+      document.getElementById('metaMonth').textContent = detectedMonth;
+      document.getElementById('metaYear').textContent = currentYear;
+
+      let pageMap = window.__lastPageMap;
+      if (!pageMap) {
+        const masterPdfBuffer = await pdfFileInput.arrayBuffer();
+        const pdfJsDoc = await pdfjsLib.getDocument({ data: masterPdfBuffer }).promise;
+        pageMap = [];
+        for (let i = 1; i <= pdfJsDoc.numPages; i++) {
+          const page = await pdfJsDoc.getPage(i);
+          const textContent = await page.getTextContent();
+          let lines = {};
+          textContent.items.forEach(item => {
+            if (item.str.trim() === '') return;
+            let y = Math.round(item.transform[5]);
+            let matchedY = Object.keys(lines).find(existingY => Math.abs(existingY - y) <= 4); 
+            if (matchedY) lines[matchedY].push({ text: item.str, x: item.transform[4] });
+            else lines[y] = [{ text: item.str, x: item.transform[4] }];
+          });
+          let pageText = Object.keys(lines)
+            .sort((a, b) => b - a) 
+            .map(y => lines[y].sort((a, b) => a.x - b.x).map(obj => obj.text).join(' '))
+            .join('\n'); 
+          pageMap.push({ pageNum: i, text: pageText });
+        }
+        window.__lastPageMap = pageMap; 
+      }
+
+      const tableBody = document.getElementById('leaveTableBody');
+      tableBody.innerHTML = '';
+      const debugBlocks = [];
+
+      reportState = [];
+
+      WORD_DOC_STAFF_LIST.forEach((staff, si) => {
+        const bestMatch = findBestMatchingPage(staff.name, pageMap);
+        const matchedPage = bestMatch ? bestMatch.page : null;
+        let parsedLeaves = matchedPage ? parseABLeavesFromText(matchedPage.text, currentYear, detectedMonth) : [];
+
+        debugBlocks.push(
+          `=== ${staff.name} (${staff.empNo}) ===\n` +
+          (matchedPage
+            ? `Matched Page: ${matchedPage.pageNum}\nPage's EMP ID Name: ${bestMatch.empName}  (similarity: ${(bestMatch.score * 100).toFixed(1)}%)\n\n--- RAW LINE-BY-LINE TEXT ---\n${matchedPage.text}\n\n--- PARSED LEAVES ---\n` +
+              (parsedLeaves.length ? parsedLeaves.map(l => `From: ${l.from}  To: ${l.to}  Days: ${l.count}`).join('\n') : '(none found)')
+            : `NO MATCHING PAGE FOUND for this staff name in the PDF (below ${(NAME_MATCH_THRESHOLD * 100).toFixed(0)}% similarity threshold).`) +
+          `\n`
+        );
+
+        reportState[si] = {
+          staff,
+          leaves: parsedLeaves.map(l => ({
+            from: l.from.replace(/-/g, '.'),
+            to: l.to.replace(/-/g, '.'),
+            count: l.count
+          }))
+        };
+
+        const tr = document.createElement('tr');
+        tr.id = `staffRow-${si}`;
+        tr.className = "hover:bg-slate-50";
+        tableBody.appendChild(tr);
+        rebuildStaffRow(si);
+      });
+
+      document.getElementById('leaveTableSection').classList.remove('hidden');
+      document.getElementById('saveFirebaseBtn').classList.remove('hidden'); 
+      document.getElementById('debugOutput').textContent = debugBlocks.join('\n' + '-'.repeat(60) + '\n\n');
+
+      generateBtn.innerText = "Generate Monthly Leave Report";
+      generateBtn.disabled = false;
+    }
+
+    async function saveCurrentBalancesToFirebase() {
+       if (!window.FirebaseDB) return alert("Firebase is not initialized properly.");
+       
+       const btn = document.getElementById('saveFirebaseBtn');
+       btn.innerText = "⏳ Saving to Database...";
+       btn.disabled = true;
+
+       const currentDocId = `${document.getElementById('metaYear').textContent}_${document.getElementById('metaMonth').textContent}`;
+       const dataToSave = {};
+
+       reportState.forEach((state, si) => {
+           const finalCasualCell = document.getElementById(`remCasualCell-${si}`).textContent;
+           const finalVacationCell = document.getElementById(`remVacationCell-${si}`).textContent;
+
+           dataToSave[state.staff.empNo] = {
+               name: state.staff.name,
+               casualAvail: (finalCasualCell === '-' || finalCasualCell === '00') ? 0 : parseFloat(finalCasualCell),
+               vacationAvail: (finalVacationCell === '-' || finalVacationCell === '00') ? 0 : parseFloat(finalVacationCell)
+           };
+       });
+
+       const success = await window.FirebaseDB.saveBalances(currentDocId, dataToSave);
+
+       if (success) {
+          btn.classList.replace('bg-blue-600', 'bg-emerald-600');
+          btn.innerText = "✅ Saved Successfully!";
+          setTimeout(() => {
+             btn.classList.replace('bg-emerald-600', 'bg-blue-600');
+             btn.innerText = "💾 Save Balances to Database";
+             btn.disabled = false;
+          }, 3000);
+       } else {
+          alert("Error saving to Firebase.");
+          btn.innerText = "💾 Save Balances to Database";
+          btn.disabled = false;
+       }
+    }
+
+    let reportState = [];
+
+    function refreshDerivedCells(si) {
+      const { staff, leaves } = reportState[si];
+      let remCasual = staff.casualAvail;
+      let remVacation = staff.vacationAvail;
+      let casualArr = [], vacationArr = [], noPayArr = [];
+
+      if (leaves.length === 0) {
+        casualArr = ['-']; vacationArr = ['-']; noPayArr = ['-'];
+      } else {
+        leaves.forEach(l => {
+          let pending = l.count || 0;
+          let cT = 0, vT = 0, nP = 0;
+
+          if (remCasual >= pending) { cT = pending; remCasual -= pending; pending = 0; } 
+          else if (remCasual > 0) { cT = remCasual; pending -= remCasual; remCasual = 0; }
+
+          if (pending > 0) {
+            if (remVacation >= pending) { vT = pending; remVacation -= pending; pending = 0; } 
+            else if (remVacation > 0) { vT = remVacation; pending -= remVacation; remVacation = 0; }
+          }
+
+          if (pending > 0) nP = pending;
+
+          casualArr.push(formatLeaveNumber(cT));
+          vacationArr.push(formatLeaveNumber(vT));
+          noPayArr.push(formatLeaveNumber(nP));
+        });
+      }
+
+      document.getElementById(`casualTakenCell-${si}`).innerHTML = casualArr.map(v => `<div class="leave-line">${v}</div>`).join('');
+      document.getElementById(`vacationTakenCell-${si}`).innerHTML = vacationArr.map(v => `<div class="leave-line">${v}</div>`).join('');
+      document.getElementById(`noPayTakenCell-${si}`).innerHTML = noPayArr.map(v => `<div class="leave-line">${v}</div>`).join('');
+      document.getElementById(`remCasualCell-${si}`).textContent = remCasual === 0 ? '00' : remCasual;
+      document.getElementById(`remVacationCell-${si}`).textContent = remVacation === 0 ? '-' : remVacation;
+    }
+
+    function updateLeaveField(si, li, field, value) {
+      const leave = reportState[si].leaves[li];
+      if (field === 'count') {
+        leave.count = parseFloat(value);
+        if (isNaN(leave.count)) leave.count = 0;
+        refreshDerivedCells(si); 
+      } else {
+        leave[field] = value; 
+      }
+    }
+
+    function addLeaveRow(si) {
+      reportState[si].leaves.push({ from: '', to: '', count: 1 });
+      rebuildStaffRow(si);
+    }
+
+    function deleteLeaveRow(si, li) {
+      reportState[si].leaves.splice(li, 1);
+      rebuildStaffRow(si);
+    }
+
+    function rebuildStaffRow(si) {
+      const { staff, leaves } = reportState[si];
+      const row = document.getElementById(`staffRow-${si}`);
+
+      const editRowsHTML = leaves.length === 0 ? '<div class="leave-line">-</div>' : leaves.map((l, li) => `
+        <div class="leave-line gap-1">
+          <button type="button" class="no-print text-red-500 hover:text-red-700 text-[10px] leading-none px-0.5" onclick="deleteLeaveRow(${si}, ${li})" title="Delete this leave">✕</button>
+          <input type="text" value="${l.from}" placeholder="DD.MM.YYYY" class="edit-input mini-input w-16 text-center border border-slate-300 rounded text-[10px]" oninput="updateLeaveField(${si}, ${li}, 'from', this.value)">
+        </div>
+      `).join('');
+
+      const toRowsHTML = leaves.length === 0 ? '<div class="leave-line">-</div>' : leaves.map((l, li) => `
+        <div class="leave-line gap-1">
+          <input type="text" value="${l.to}" placeholder="DD.MM.YYYY" class="edit-input mini-input w-16 text-center border border-slate-300 rounded text-[10px]" oninput="updateLeaveField(${si}, ${li}, 'to', this.value)">
+          <input type="number" step="0.5" min="0" value="${l.count}" title="Days taken" class="no-print edit-input mini-input w-10 text-center border border-slate-300 rounded text-[10px]" oninput="updateLeaveField(${si}, ${li}, 'count', this.value)">
+        </div>
+      `).join('');
+
+      const addBtnHTML = `<button type="button" class="no-print mt-1 text-[10px] text-teal-700 hover:text-teal-900 font-semibold border border-teal-300 hover:bg-teal-50 rounded px-1.5 py-0.5" onclick="addLeaveRow(${si})">+ Add Leave</button>`;
+
+      row.innerHTML = `
+        <td class="p-1 border border-black text-center font-medium align-top">${staff.no}</td>
+        <td class="p-1 border border-black text-center font-medium align-top">${staff.empNo}</td>
+        <td class="p-1 border border-black font-semibold align-top">${staff.name}</td>
+        <td class="p-1 border border-black align-top">${staff.designation}</td>
+        <td class="p-1 border border-black align-top">${staff.department}</td>
+        <td class="p-1 border border-black text-center font-bold align-top">${editRowsHTML}${addBtnHTML}</td>
+        <td class="p-1 border border-black text-center font-bold align-top">${toRowsHTML}</td>
+        <td id="casualTakenCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td id="vacationTakenCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td class="p-1 border border-black text-center align-top">-</td>
+        <td class="p-1 border border-black text-center align-top">-</td>
+        <td id="noPayTakenCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td id="remCasualCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td id="remVacationCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td class="p-1 border border-black text-center align-top">-</td>
+        <td class="p-1 border border-black text-center align-top">-</td>
+        <td class="p-1 border border-black text-center align-top">-</td>
+      `;
+
+      refreshDerivedCells(si);
+    }
+
+    function toggleDebugPanel() { document.getElementById('debugPanel').classList.toggle('hidden'); }
+    function copyDebugText() { navigator.clipboard.writeText(document.getElementById('debugOutput').textContent); }
+    function formatLeaveNumber(num) {
+      if (num === 0) return '-';
+      if (num < 10 && Number.isInteger(num)) return '0' + num;
+      return num.toString();
+    }
+    function extractMonthNameOnly(fileName) {
+      for (const month of MONTH_NAMES) {
+        if (new RegExp('\\b' + month + '\\b', 'i').test(fileName)) return month;
+      }
+      return MONTH_NAMES[new Date().getMonth()];
+    }
+    function normalizeFullName(name) {
+      return name.toLowerCase().replace(/\b(mr|mrs|ms|dr)\.?\b/g, '').replace(/[^a-z\s]/g, ' ').trim().split(/\s+/).filter(Boolean).sort().join(' ');
+    }
+    function extractEmpNameFromPage(pdfText) {
+      const m = pdfText.match(/EMP\s*ID\s*:\s*\S+\s*-\s*(.+)/i);
+      return m ? m[1].split('\n')[0].trim() : null;
+    }
+    function levenshtein(a, b) {
+      const m = a.length, n = b.length;
+      if (m === 0) return n;
+      if (n === 0) return m;
+      const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+      for (let i = 0; i <= m; i++) dp[i][0] = i;
+      for (let j = 0; j <= n; j++) dp[0][j] = j;
+      for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+          const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+          dp[i][j] = Math.min( dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost );
+        }
+      }
+      return dp[m][n];
+    }
+    function nameSimilarity(nameA, nameB) {
+      const na = normalizeFullName(nameA);
+      const nb = normalizeFullName(nameB);
+      if (!na || !nb) return 0;
+      const dist = levenshtein(na, nb);
+      const maxLen = Math.max(na.length, nb.length);
+      return maxLen === 0 ? 1 : 1 - (dist / maxLen);
+    }
+    const NAME_MATCH_THRESHOLD = 0.72; 
+    function findBestMatchingPage(staffFullName, pageMap) {
+      let best = null;
+      for (const p of pageMap) {
+        const empName = extractEmpNameFromPage(p.text);
+        if (!empName) continue;
+        const score = nameSimilarity(staffFullName, empName);
+        if (!best || score > best.score) best = { page: p, empName, score };
+      }
+      if (best && best.score >= NAME_MATCH_THRESHOLD) return best;
+      return null;
+    }
+
+    function parseABLeavesFromText(pdfText, year, monthStr) {
+      const isoRegex = /(\d{4})-(\d{2})-(\d{2})\b[^\n\r]*?\b(ABH|AB)\b/gi;
+      let match, rawLeaves = [];
+
+      while ((match = isoRegex.exec(pdfText)) !== null) {
+        rawLeaves.push({
+          day: parseInt(match[3], 10),
+          month: parseInt(match[2], 10),
+          year: parseInt(match[1], 10),
+          weight: match[4].toUpperCase() === 'AB' ? 1.0 : 0.5
+        });
+      }
+
+      if (rawLeaves.length === 0) {
+        const fallbackRegex = /\b(\d{1,2})\b[^\n\r]*?\b(ABH|AB)\b/gi;
+        const monthIdx = MONTH_NAMES.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
+        const mNum = monthIdx >= 0 ? monthIdx + 1 : new Date().getMonth() + 1;
+
+        while ((match = fallbackRegex.exec(pdfText)) !== null) {
+          const d = parseInt(match[1], 10);
+          if (d >= 1 && d <= 31) {
+            rawLeaves.push({
+              day: d,
+              month: mNum,
+              year: year,
+              weight: match[2].toUpperCase() === 'AB' ? 1.0 : 0.5
+            });
+          }
+        }
+      }
+
+      if (rawLeaves.length === 0) return [];
+      rawLeaves.sort((a, b) => a.day - b.day);
+      const uniqueLeaves = [];
+      rawLeaves.forEach(l => {
+        if (!uniqueLeaves.some(u => u.day === l.day)) uniqueLeaves.push(l);
+      });
+
+      let events = [];
+      let currentGroup = [uniqueLeaves[0]];
+      for (let i = 1; i < uniqueLeaves.length; i++) {
+        if (uniqueLeaves[i].day === uniqueLeaves[i - 1].day + 1) {
+          currentGroup.push(uniqueLeaves[i]);
+        } else {
+          events.push(formatGroupToDateRange(currentGroup));
+          currentGroup = [uniqueLeaves[i]];
+        }
+      }
+      events.push(formatGroupToDateRange(currentGroup));
+      return events;
+    }
+
+    function formatGroupToDateRange(group) {
+      const startDay = String(group[0].day).padStart(2, '0');
+      const endDay = String(group[group.length - 1].day).padStart(2, '0');
+      const month = String(group[0].month).padStart(2, '0');
+      const year = group[0].year;
+      const totalCount = group.reduce((sum, item) => sum + item.weight, 0);
+
+      return {
+        from: `${startDay}-${month}-${year}`,
+        to: `${endDay}-${month}-${year}`,
+        count: totalCount
+      };
+    }
+
+    // --- SECTION 3 SCRIPT (Academic Permanent Staff) ---
+    // First 4 persons populated with exact Word document data (manual: true, fully editable)
+    // Persons 05 to 09 parsed automatically from PDF
+    let ACADEMIC_STAFF_LIST = [
+      { 
+        no: "01", 
+        empNo: "02601", 
+        name: "Mr. Kaneshanathan Ananthakrishnan", 
+        designation: "Head", 
+        department: "Computer Unit", 
+        casualAvail: 18, 
+        vacationAvail: 24, 
+        manual: true,
+        defaultLeaves: []
+      },
+      { 
+        no: "02", 
+        empNo: "02153", 
+        name: "Mrs. Pavalarani Balendran", 
+        designation: "Lecturer", 
+        department: "Computer Unit", 
+        casualAvail: 9, 
+        vacationAvail: 24, 
+        manual: true,
+        defaultLeaves: []
+      },
+      { 
+        no: "03", 
+        empNo: "02194", 
+        name: "Mrs. Varnarubiny Surendranathan", 
+        designation: "Lecturer", 
+        department: "Computer Unit", 
+        casualAvail: 17, 
+        vacationAvail: 24, 
+        manual: true,
+        defaultLeaves: []
+      },
+      { 
+        no: "04", 
+        empNo: "03015", 
+        name: "Mrs. Subashini  Aravinthan", 
+        designation: "Lecturer", 
+        department: "Computer Unit", 
+        casualAvail: 19, 
+        vacationAvail: 10, 
+        manual: true,
+        defaultLeaves: []
+      },
+      { no: "05", empNo: "02531", name: "Mr. Sivapathasuntharam Sivaskaran", pdfName: "Mr. S. Sivaskaran", designation: "System Engineer", department: "Computer Unit", casualAvail: 2, vacationAvail: 22.5, manual: false },
+      { no: "06", empNo: "03661", name: "Mr. Sivasubramanium Sivaraj", pdfName: "Mr. S. Sivaraj", designation: "Instructor", department: "Computer Unit", casualAvail: 9.5, vacationAvail: 24, manual: false },
+      { no: "07", empNo: "04979", name: "Mr. Rameswaran Sanjeevan", pdfName: "Mr. R. Sanjeevan", designation: "Instructor", department: "Computer Unit", casualAvail: 14.5, vacationAvail: 24, manual: false },
+      { no: "08", empNo: "03660", name: "Mr. Vadivel Aravinthan", pdfName: "Mr. V. Aravithan", designation: "Computer Programmer", department: "Computer Unit", casualAvail: 14, vacationAvail: 24, manual: false },
+      { no: "09", empNo: "02853", name: "Mr. Poobalasingam Kobikrishna", pdfName: "Mr. P. Kobikrishna", designation: "Assistant Network Manager", department: "Computer Unit", casualAvail: 15, vacationAvail: 24, manual: false }
+    ];
+
+    let academicReportState = [];
+
+    async function generateAcademicLeaveStatement() {
+      const pdfFileInput = document.getElementById('pdfInput').files[0];
+
+      if (!pdfFileInput) {
+        alert('Please upload Section 1 Multi-Page Attendance PDF first!');
+        return;
+      }
+
+      const generateBtn = document.getElementById('generateAcademicReportBtn');
+      generateBtn.innerText = "Processing & Fetching DB...";
+      generateBtn.disabled = true;
+
+      const uploadFileName = pdfFileInput.name;
+      const detectedMonth = extractMonthNameOnly(uploadFileName);
+      const currentYear = new Date().getFullYear();
+
+      if (window.FirebaseDB) {
+        const prevTime = getPreviousMonthStr(detectedMonth, currentYear);
+        const prevDocId = `${prevTime.year}_${prevTime.month}`;
+        
+        const prevData = await window.FirebaseDB.getAcademicBalances(prevDocId);
+        
+        if (prevData) {
+          ACADEMIC_STAFF_LIST = ACADEMIC_STAFF_LIST.map(staff => {
+             if (prevData[staff.empNo]) {
+                staff.casualAvail = prevData[staff.empNo].casualAvail;
+                staff.vacationAvail = prevData[staff.empNo].vacationAvail;
+             }
+             return staff;
+          });
+        }
+      }
+
+      document.getElementById('metaAcademicMonth').textContent = detectedMonth;
+      document.getElementById('metaAcademicYear').textContent = currentYear;
+
+      let pageMap = window.__lastPageMap;
+      if (!pageMap) {
+        const masterPdfBuffer = await pdfFileInput.arrayBuffer();
+        const pdfJsDoc = await pdfjsLib.getDocument({ data: masterPdfBuffer }).promise;
+        pageMap = [];
+        for (let i = 1; i <= pdfJsDoc.numPages; i++) {
+          const page = await pdfJsDoc.getPage(i);
+          const textContent = await page.getTextContent();
+          let lines = {};
+          textContent.items.forEach(item => {
+            if (item.str.trim() === '') return;
+            let y = Math.round(item.transform[5]);
+            let matchedY = Object.keys(lines).find(existingY => Math.abs(existingY - y) <= 4); 
+            if (matchedY) lines[matchedY].push({ text: item.str, x: item.transform[4] });
+            else lines[y] = [{ text: item.str, x: item.transform[4] }];
+          });
+          let pageText = Object.keys(lines)
+            .sort((a, b) => b - a) 
+            .map(y => lines[y].sort((a, b) => a.x - b.x).map(obj => obj.text).join(' '))
+            .join('\n'); 
+          pageMap.push({ pageNum: i, text: pageText });
+        }
+        window.__lastPageMap = pageMap;
+      }
+
+      const tableBody = document.getElementById('academicLeaveTableBody');
+      tableBody.innerHTML = '';
+      const debugBlocks = [];
+      academicReportState = [];
+
+      ACADEMIC_STAFF_LIST.forEach((staff, si) => {
+        let parsedLeaves = [];
+        let matchedPage = null;
+
+        if (!staff.manual) {
+          matchedPage = pageMap.find(p => isStrictNameMatch(p.text, staff.pdfName));
+          if (!matchedPage) {
+            const best = findBestMatchingPage(staff.name, pageMap);
+            if (best) matchedPage = best.page;
+          }
+          if (matchedPage) {
+            parsedLeaves = parseABLeavesFromText(matchedPage.text, currentYear, detectedMonth);
+          }
+        } else if (staff.defaultLeaves) {
+          parsedLeaves = JSON.parse(JSON.stringify(staff.defaultLeaves));
+        }
+
+        debugBlocks.push(
+          `=== ${staff.name} (${staff.empNo}) - ${staff.manual ? 'MANUAL / DEFAULT ENTRY' : 'PDF Search: ' + staff.pdfName} ===\n` +
+          (staff.manual
+            ? `Loaded pre-filled default leaves from document (fully editable in table).`
+            : (matchedPage
+                ? `Matched Page: ${matchedPage.pageNum}\n\n--- RAW TEXT ---\n${matchedPage.text}\n\n--- PARSED LEAVES ---\n` +
+                  (parsedLeaves.length ? parsedLeaves.map(l => `From: ${l.from} To: ${l.to} Days: ${l.count}`).join('\n') : '(none found)')
+                : `NO MATCHING PAGE FOUND.`)) + `\n`
+        );
+
+        academicReportState[si] = {
+          staff,
+          leaves: parsedLeaves.map(l => ({
+            from: l.from.replace(/-/g, '.'),
+            to: l.to.replace(/-/g, '.'),
+            count: l.count
+          }))
+        };
+
+        const tr = document.createElement('tr');
+        tr.id = `academicStaffRow-${si}`;
+        tr.className = "hover:bg-slate-50";
+        tableBody.appendChild(tr);
+        rebuildAcademicStaffRow(si);
+      });
+
+      document.getElementById('academicLeaveTableSection').classList.remove('hidden');
+      document.getElementById('saveAcademicFirebaseBtn').classList.remove('hidden');
+      document.getElementById('academicDebugOutput').textContent = debugBlocks.join('\n' + '-'.repeat(60) + '\n\n');
+
+      generateBtn.innerText = "Generate Academic Leave Report";
+      generateBtn.disabled = false;
+    }
+
+    function rebuildAcademicStaffRow(si) {
+      const { staff, leaves } = academicReportState[si];
+      const row = document.getElementById(`academicStaffRow-${si}`);
+
+      const editRowsHTML = leaves.length === 0 ? '<div class="leave-line">-</div>' : leaves.map((l, li) => `
+        <div class="leave-line gap-1">
+          <button type="button" class="no-print text-red-500 hover:text-red-700 text-[10px] leading-none px-0.5" onclick="deleteAcademicLeaveRow(${si}, ${li})" title="Delete this leave">✕</button>
+          <input type="text" value="${l.from}" placeholder="DD.MM.YYYY" class="edit-input mini-input w-16 text-center border border-slate-300 rounded text-[10px]" oninput="updateAcademicLeaveField(${si}, ${li}, 'from', this.value)">
+        </div>
+      `).join('');
+
+      const toRowsHTML = leaves.length === 0 ? '<div class="leave-line">-</div>' : leaves.map((l, li) => `
+        <div class="leave-line gap-1">
+          <input type="text" value="${l.to}" placeholder="DD.MM.YYYY" class="edit-input mini-input w-16 text-center border border-slate-300 rounded text-[10px]" oninput="updateAcademicLeaveField(${si}, ${li}, 'to', this.value)">
+          <input type="number" step="0.5" min="0" value="${l.count}" title="Days taken" class="no-print edit-input mini-input w-10 text-center border border-slate-300 rounded text-[10px]" oninput="updateAcademicLeaveField(${si}, ${li}, 'count', this.value)">
+        </div>
+      `).join('');
+
+      const addBtnHTML = `<button type="button" class="no-print mt-1 text-[10px] text-indigo-700 hover:text-indigo-900 font-semibold border border-indigo-300 hover:bg-indigo-50 rounded px-1.5 py-0.5" onclick="addAcademicLeaveRow(${si})">+ Add Leave</button>`;
+
+      row.innerHTML = `
+        <td class="p-1 border border-black text-center font-medium align-top">${staff.no}</td>
+        <td class="p-1 border border-black text-center font-medium align-top">${staff.empNo}</td>
+        <td class="p-1 border border-black font-semibold align-top">${staff.name}</td>
+        <td class="p-1 border border-black align-top">${staff.designation}</td>
+        <td class="p-1 border border-black align-top">${staff.department}</td>
+        <td class="p-1 border border-black text-center font-bold align-top">${editRowsHTML}${addBtnHTML}</td>
+        <td class="p-1 border border-black text-center font-bold align-top">${toRowsHTML}</td>
+        <td id="acadCasualTakenCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td id="acadVacationTakenCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td class="p-1 border border-black text-center align-top">-</td>
+        <td class="p-1 border border-black text-center align-top">-</td>
+        <td id="acadNoPayTakenCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td id="acadRemCasualCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td id="acadRemVacationCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td class="p-1 border border-black text-center align-top">-</td>
+        <td class="p-1 border border-black text-center align-top">-</td>
+        <td class="p-1 border border-black text-center align-top">-</td>
+      `;
+      refreshAcademicDerivedCells(si);
+    }
+
+    function refreshAcademicDerivedCells(si) {
+      const { staff, leaves } = academicReportState[si];
+      let remCasual = staff.casualAvail;
+      let remVacation = staff.vacationAvail;
+      let casualArr = [], vacationArr = [], noPayArr = [];
+
+      if (leaves.length === 0) {
+        casualArr = ['-']; vacationArr = ['-']; noPayArr = ['-'];
+      } else {
+        leaves.forEach(l => {
+          let pending = l.count || 0;
+          let cT = 0, vT = 0, nP = 0;
+          if (remCasual >= pending) { cT = pending; remCasual -= pending; pending = 0; } 
+          else if (remCasual > 0) { cT = remCasual; pending -= remCasual; remCasual = 0; }
+          if (pending > 0) {
+            if (remVacation >= pending) { vT = pending; remVacation -= pending; pending = 0; } 
+            else if (remVacation > 0) { vT = remVacation; pending -= remVacation; remVacation = 0; }
+          }
+          if (pending > 0) nP = pending;
+          casualArr.push(formatLeaveNumber(cT));
+          vacationArr.push(formatLeaveNumber(vT));
+          noPayArr.push(formatLeaveNumber(nP));
+        });
+      }
+
+      document.getElementById(`acadCasualTakenCell-${si}`).innerHTML = casualArr.map(v => `<div class="leave-line">${v}</div>`).join('');
+      document.getElementById(`acadVacationTakenCell-${si}`).innerHTML = vacationArr.map(v => `<div class="leave-line">${v}</div>`).join('');
+      document.getElementById(`acadNoPayTakenCell-${si}`).innerHTML = noPayArr.map(v => `<div class="leave-line">${v}</div>`).join('');
+      document.getElementById(`acadRemCasualCell-${si}`).textContent = remCasual === 0 ? '00' : remCasual;
+      document.getElementById(`acadRemVacationCell-${si}`).textContent = remVacation === 0 ? '-' : remVacation;
+    }
+
+    function updateAcademicLeaveField(si, li, field, value) {
+      const leave = academicReportState[si].leaves[li];
+      if (field === 'count') {
+        leave.count = parseFloat(value);
+        if (isNaN(leave.count)) leave.count = 0;
+        refreshAcademicDerivedCells(si); 
+      } else leave[field] = value; 
+    }
+    function addAcademicLeaveRow(si) { academicReportState[si].leaves.push({ from: '', to: '', count: 1 }); rebuildAcademicStaffRow(si); }
+    function deleteAcademicLeaveRow(si, li) { academicReportState[si].leaves.splice(li, 1); rebuildAcademicStaffRow(si); }
+
+    async function saveAcademicBalancesToFirebase() {
+      const btn = document.getElementById('saveAcademicFirebaseBtn');
+      btn.innerText = "⏳ Saving to Academic DB...";
+      btn.disabled = true;
+
+      const currentDocId = `${document.getElementById('metaAcademicYear').textContent}_${document.getElementById('metaAcademicMonth').textContent}`;
+      const dataToSave = {};
+
+      academicReportState.forEach((state, si) => {
+        const casualText = document.getElementById(`acadRemCasualCell-${si}`).textContent;
+        const vacationText = document.getElementById(`acadRemVacationCell-${si}`).textContent;
+        dataToSave[state.staff.empNo] = {
+          name: state.staff.name,
+          casualAvail: (casualText === '-' || casualText === '00') ? 0 : parseFloat(casualText),
+          vacationAvail: (vacationText === '-' || vacationText === '00') ? 0 : parseFloat(vacationText)
+        };
+      });
+
+      const success = await window.FirebaseDB.saveAcademicBalances(currentDocId, dataToSave);
+      if (success) {
+        btn.classList.replace('bg-blue-600', 'bg-emerald-600');
+        btn.innerText = "✅ Saved Successfully!";
+        setTimeout(() => {
+          btn.classList.replace('bg-emerald-600', 'bg-blue-600');
+          btn.innerText = "💾 Save Academic Balances";
+          btn.disabled = false;
+        }, 3000);
+      } else {
+        alert("Error saving to Firebase.");
+        btn.innerText = "💾 Save Academic Balances";
+        btn.disabled = false;
+      }
+    }
+
+    function toggleAcademicDebugPanel() { document.getElementById('academicDebugPanel').classList.toggle('hidden'); }
+    function copyAcademicDebugText() { navigator.clipboard.writeText(document.getElementById('academicDebugOutput').textContent); }
+
+    // =========================================================
+    // --- SECTION 4 SCRIPT (Academic Temporary Staff) ---
+    // =========================================================
+
+    const DEFAULT_TEMP_STAFF_LIST = [
+      { name: "Mr. Rafeek Sibrikhan", pdfName: "Mr. R. Sibrikhan", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Mr. Uthayakumar Kirushanth", pdfName: "Mr. Uthayakumar Kirushanth", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Miss. Henrich Ravi Ann Kishanthi", pdfName: "Ms. Henrich Ravi Ann Kishanthi", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Mr. Sathasivam Nerujan", pdfName: "Mr. S Nerujan", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Miss. Varsha Thayananthan", pdfName: "Ms. Varsha Thayananthan", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Mr. Thanendran Sivaparan", pdfName: "Mr. Thanendran Sivaparan", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Mr. Manokararasa Karthikan", pdfName: "Mr. M. Karthikan", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Mr. Selvarasa Tharsan", pdfName: "Mr. S. Tharsan", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Ms. Anat Sutharsica Rajakumar", pdfName: "Ms. Anat Sutharsica Rajakumar", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Mr. Sutheskumar Piriyaluxan", pdfName: "Mr. Sutheskumar Piriyaluxan", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Ms. Piviththira Paramaseelan", pdfName: "Ms. Piviththira Paramaseelan", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Ms. Kulaksiga Jogeshwaran", pdfName: "Ms. Kulaksiga Jogeshwaran", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Mr. Dominic Xavidhar Diron De Mel", pdfName: "Mr. Dominic Xavidhar Diron De Mel", designation: "Temporary Instructor", department: "Computer Unit" },
+      { name: "Mr. Thevarajan Jeevathuvarakan", pdfName: "Mr. T. Geevathvarakan", designation: "Temporary Instructor", department: "Computer Unit" }
+    ];
+
+    // Load Temp Staff from Local Storage or use Defaults
+    let TEMP_STAFF_LIST = [];
+    try {
+      const stored = localStorage.getItem('ls_temp_academic_staff');
+      if (stored) {
+        TEMP_STAFF_LIST = JSON.parse(stored);
+      } else {
+        TEMP_STAFF_LIST = JSON.parse(JSON.stringify(DEFAULT_TEMP_STAFF_LIST));
+      }
+    } catch(e) {
+      TEMP_STAFF_LIST = JSON.parse(JSON.stringify(DEFAULT_TEMP_STAFF_LIST));
+    }
+
+    function saveTempListToStorage() {
+      localStorage.setItem('ls_temp_academic_staff', JSON.stringify(TEMP_STAFF_LIST));
+    }
+
+    let tempReportState = [];
+
+    async function generateTempLeaveStatement() {
+      const pdfFileInput = document.getElementById('pdfInput').files[0];
+      
+      if (!pdfFileInput) {
+        alert('Please upload Section 1 Multi-Page Attendance PDF first!');
+        return;
+      }
+
+      const generateBtn = document.getElementById('generateTempReportBtn');
+      generateBtn.innerText = "Processing Data...";
+      generateBtn.disabled = true;
+
+      const uploadFileName = pdfFileInput.name;
+      const detectedMonth = extractMonthNameOnly(uploadFileName);
+      const currentYear = new Date().getFullYear();
+
+      document.getElementById('metaTempMonth').textContent = detectedMonth;
+      document.getElementById('metaTempYear').textContent = currentYear;
+
+      let pageMap = window.__lastPageMap;
+      if (!pageMap) {
+        const masterPdfBuffer = await pdfFileInput.arrayBuffer();
+        const pdfJsDoc = await pdfjsLib.getDocument({ data: masterPdfBuffer }).promise;
+        pageMap = [];
+        for (let i = 1; i <= pdfJsDoc.numPages; i++) {
+          const page = await pdfJsDoc.getPage(i);
+          const textContent = await page.getTextContent();
+          let lines = {};
+          textContent.items.forEach(item => {
+            if (item.str.trim() === '') return;
+            let y = Math.round(item.transform[5]);
+            let matchedY = Object.keys(lines).find(existingY => Math.abs(existingY - y) <= 4); 
+            if (matchedY) lines[matchedY].push({ text: item.str, x: item.transform[4] });
+            else lines[y] = [{ text: item.str, x: item.transform[4] }];
+          });
+          let pageText = Object.keys(lines)
+            .sort((a, b) => b - a) 
+            .map(y => lines[y].sort((a, b) => a.x - b.x).map(obj => obj.text).join(' '))
+            .join('\n'); 
+          pageMap.push({ pageNum: i, text: pageText });
+        }
+        window.__lastPageMap = pageMap; 
+      }
+
+      tempReportState = [];
+
+      TEMP_STAFF_LIST.forEach((staff, si) => {
+        let parsedLeaves = [];
+        let matchedPage = null;
+
+        // Try matching Employee ID first for higher accuracy
+        if (staff.empId) {
+          matchedPage = pageMap.find(p => p.text.includes(staff.empId));
+        }
+
+        // Fallback to pdfName
+        if (!matchedPage && staff.pdfName) {
+          matchedPage = pageMap.find(p => isStrictNameMatch(p.text, staff.pdfName));
+        }
+        
+        // Final fallback to strictly matched regular Name
+        if (!matchedPage) {
+          const bestMatch = findBestMatchingPage(staff.name, pageMap);
+          if (bestMatch) matchedPage = bestMatch.page;
+        }
+
+        if (matchedPage) {
+          parsedLeaves = parseABLeavesFromText(matchedPage.text, currentYear, detectedMonth);
+        }
+
+        tempReportState[si] = {
+          staff: { ...staff },
+          leaves: parsedLeaves.map(l => ({
+            from: l.from.replace(/-/g, '.'),
+            to: l.to.replace(/-/g, '.'),
+            count: l.count
+          }))
+        };
+      });
+
+      renderTempTable();
+
+      document.getElementById('tempLeaveTableSection').classList.remove('hidden');
+      generateBtn.innerText = "Generate Temporary Staff Report";
+      generateBtn.disabled = false;
+    }
+
+    function renderTempTable() {
+      const tableBody = document.getElementById('tempLeaveTableBody');
+      tableBody.innerHTML = '';
+      tempReportState.forEach((state, si) => {
+        const tr = document.createElement('tr');
+        tr.id = `tempStaffRow-${si}`;
+        tr.className = "hover:bg-slate-50";
+        tableBody.appendChild(tr);
+        rebuildTempStaffRow(si);
+      });
+    }
+
+    function updateTempStaffField(si, field, value) {
+      tempReportState[si].staff[field] = value;
+      if (TEMP_STAFF_LIST[si]) {
+        TEMP_STAFF_LIST[si][field] = value;
+        saveTempListToStorage(); // Permanent persistence
+      }
+    }
+
+    // Modal Control Functions
+    function openTempStaffModal() {
+      document.getElementById('addTempStaffModal').classList.remove('hidden');
+      document.getElementById('newTempName').value = '';
+      document.getElementById('newTempPdfName').value = '';
+      document.getElementById('newTempEmpId').value = '';
+    }
+
+    function closeTempStaffModal() {
+      document.getElementById('addTempStaffModal').classList.add('hidden');
+    }
+
+    function saveNewTempStaff() {
+      const name = document.getElementById('newTempName').value.trim();
+      const pdfName = document.getElementById('newTempPdfName').value.trim();
+      const empId = document.getElementById('newTempEmpId').value.trim();
+
+      if (!name) {
+        alert("Report Name is required to add a staff member.");
+        return;
+      }
+
+      const newStaff = { 
+        name: name, 
+        pdfName: pdfName, 
+        empId: empId,
+        designation: "Temporary Instructor", 
+        department: "Computer Unit" 
+      };
+
+      TEMP_STAFF_LIST.push(newStaff);
+      
+      // If table is already initialized/active, add it to current report state
+      if (tempReportState.length > 0 || !document.getElementById('tempLeaveTableSection').classList.contains('hidden')) {
+        tempReportState.push({
+          staff: { ...newStaff },
+          leaves: []
+        });
+        renderTempTable();
+      }
+      
+      saveTempListToStorage();
+      closeTempStaffModal();
+    }
+
+    function deleteTempStaffMember(si) {
+      if (confirm('Are you sure you want to permanently remove this temporary staff member?')) {
+        TEMP_STAFF_LIST.splice(si, 1);
+        tempReportState.splice(si, 1);
+        saveTempListToStorage();
+        renderTempTable();
+      }
+    }
+
+    function addTempLeaveRow(si) {
+      tempReportState[si].leaves.push({ from: '', to: '', count: 1 });
+      rebuildTempStaffRow(si);
+    }
+
+    function deleteTempLeaveRow(si, li) {
+      tempReportState[si].leaves.splice(li, 1);
+      rebuildTempStaffRow(si);
+    }
+
+    function updateTempLeaveField(si, li, field, value) {
+      const leave = tempReportState[si].leaves[li];
+      if (field === 'count') {
+        leave.count = parseFloat(value);
+        if (isNaN(leave.count)) leave.count = 0;
+        refreshTempDerivedCells(si);
+      } else {
+        leave[field] = value;
+      }
+    }
+
+    function refreshTempDerivedCells(si) {
+      const { leaves } = tempReportState[si];
+      let casualArr = [];
+      
+      if (leaves.length === 0) {
+        casualArr = ['-'];
+      } else {
+        leaves.forEach(l => {
+          casualArr.push(formatLeaveNumber(l.count || 0));
+        });
+      }
+
+      document.getElementById(`tempCasualTakenCell-${si}`).innerHTML = casualArr.map(v => `<div class="leave-line">${v}</div>`).join('');
+      
+      // Default to dashes as requested
+      const defaultEmptyArr = leaves.length === 0 ? ['-'] : leaves.map(() => '-');
+      const defaultEmptyHTML = defaultEmptyArr.map(v => `<div class="leave-line">${v}</div>`).join('');
+      
+      document.getElementById(`tempVacationTakenCell-${si}`).innerHTML = defaultEmptyHTML;
+      document.getElementById(`tempStudyTakenCell-${si}`).innerHTML = defaultEmptyHTML;
+      document.getElementById(`tempPaidTakenCell-${si}`).innerHTML = defaultEmptyHTML;
+      document.getElementById(`tempNoPayTakenCell-${si}`).innerHTML = defaultEmptyHTML;
+    }
+
+    function rebuildTempStaffRow(si) {
+      const { staff, leaves } = tempReportState[si];
+      const row = document.getElementById(`tempStaffRow-${si}`);
+
+      const editRowsHTML = leaves.length === 0 ? '<div class="leave-line">-</div>' : leaves.map((l, li) => `
+        <div class="leave-line gap-1">
+          <button type="button" class="no-print text-red-500 hover:text-red-700 text-[10px] leading-none px-0.5" onclick="deleteTempLeaveRow(${si}, ${li})" title="Delete this leave">✕</button>
+          <input type="text" value="${l.from}" placeholder="DD.MM.YYYY" class="edit-input mini-input w-16 text-center border border-slate-300 rounded text-[10px]" oninput="updateTempLeaveField(${si}, ${li}, 'from', this.value)">
+        </div>
+      `).join('');
+
+      const toRowsHTML = leaves.length === 0 ? '<div class="leave-line">-</div>' : leaves.map((l, li) => `
+        <div class="leave-line gap-1">
+          <input type="text" value="${l.to}" placeholder="DD.MM.YYYY" class="edit-input mini-input w-16 text-center border border-slate-300 rounded text-[10px]" oninput="updateTempLeaveField(${si}, ${li}, 'to', this.value)">
+          <input type="number" step="0.5" min="0" value="${l.count}" title="Days taken" class="no-print edit-input mini-input w-10 text-center border border-slate-300 rounded text-[10px]" oninput="updateTempLeaveField(${si}, ${li}, 'count', this.value)">
+        </div>
+      `).join('');
+
+      const addBtnHTML = `<button type="button" class="no-print mt-1 text-[10px] text-orange-700 hover:text-orange-900 font-semibold border border-orange-300 hover:bg-orange-50 rounded px-1.5 py-0.5" onclick="addTempLeaveRow(${si})">+ Add Leave</button>`;
+
+      row.innerHTML = `
+        <td class="p-1 border border-black text-center font-medium align-top">
+          <div>${String(si + 1).padStart(2, '0')}</div>
+          <button type="button" class="no-print mt-1 text-[9px] text-red-700 bg-red-100 hover:bg-red-200 border border-red-300 font-bold px-1.5 py-0.5 rounded shadow-sm transition-colors w-full" onclick="deleteTempStaffMember(${si})" title="Delete Member">Remove</button>
+        </td>
+        <td class="p-1 border border-black font-semibold align-top">
+          <input type="text" class="edit-input w-full bg-transparent" value="${staff.name}" oninput="updateTempStaffField(${si}, 'name', this.value)">
+        </td>
+        <td class="p-1 border border-black align-top">
+          <input type="text" class="edit-input w-full bg-transparent" value="${staff.designation}" oninput="updateTempStaffField(${si}, 'designation', this.value)">
+        </td>
+        <td class="p-1 border border-black align-top">
+          <input type="text" class="edit-input w-full bg-transparent" value="${staff.department}" oninput="updateTempStaffField(${si}, 'department', this.value)">
+        </td>
+        <td class="p-1 border border-black text-center font-bold align-top">${editRowsHTML}${addBtnHTML}</td>
+        <td class="p-1 border border-black text-center font-bold align-top">${toRowsHTML}</td>
+        <td id="tempCasualTakenCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td id="tempVacationTakenCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td id="tempStudyTakenCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td id="tempPaidTakenCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td id="tempNoPayTakenCell-${si}" class="p-1 border border-black text-center font-bold align-top"></td>
+        <td class="p-1 border border-black text-center font-bold align-top">-</td>
+        <td class="p-1 border border-black text-center font-bold align-top">-</td>
+        <td class="p-1 border border-black text-center font-bold align-top">-</td>
+        <td class="p-1 border border-black text-center font-bold align-top">-</td>
+        <td class="p-1 border border-black text-center align-top">-</td>
+      `;
+      
+      refreshTempDerivedCells(si);
+    }
+    
+    // --- HELPER PRINT FUNCTION ---
+    function printSection(sectionId) {
+      const allSections = ['section1', 'section2', 'section3', 'section4'];
+      
+      // Temporarily hide all other sections
+      allSections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && id !== sectionId) {
+          el.classList.add('print-hidden');
+        }
+      });
+      
+      // Print the page
+      window.print();
+      
+      // Restore all sections to visible
+      allSections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.remove('print-hidden');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

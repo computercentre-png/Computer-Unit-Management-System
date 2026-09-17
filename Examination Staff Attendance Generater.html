@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>University of Jaffna - Examination Staff Attendance</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 15mm 15mm 15mm 15mm;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .document-container {
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 !important;
+                width: 100% !important;
+                padding: 0 !important;
+            }
+            select, input[type="text"], input[type="time"], textarea {
+                border: none !important;
+                background: transparent !important;
+                appearance: none !important;
+                -webkit-appearance: none !important;
+            }
+            select {
+                -moz-appearance: none;
+                text-indent: 0.01px;
+                text-overflow: '';
+            }
+            /* Hide calendar icon on print */
+            .date-picker-native {
+                display: none !important;
+            }
+        }
+
+        body {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            color: #000;
+        }
+
+        .controls-bar {
+            max-width: 850px;
+            margin: 0 auto 20px auto;
+            background: #ffffff;
+            padding: 15px 20px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn {
+            background-color: #003366;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background-color: #002244;
+        }
+
+        .document-container {
+            max-width: 850px;
+            background: #fff;
+            margin: 0 auto;
+            padding: 40px 50px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.15);
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .header-title {
+            text-align: center;
+            font-weight: bold;
+            line-height: 1.3;
+        }
+
+        .header-title h2 {
+            margin: 0;
+            font-size: 15pt;
+            text-transform: uppercase;
+        }
+
+        .header-title h3 {
+            margin: 2px 0 0 0;
+            font-size: 13pt;
+            font-weight: bold;
+        }
+
+        .form-row {
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 10px;
+            font-size: 11pt;
+        }
+
+        .form-row label {
+            white-space: nowrap;
+            font-weight: bold;
+        }
+
+        /* Standard 1-line dotted input style */
+        .dots-input {
+            flex-grow: 1;
+            border: none;
+            border-bottom: 1px dotted #000;
+            outline: none;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            padding: 0 5px;
+            background: transparent;
+        }
+
+        /* Date input container for DD/MM/YYYY formatting with calendar picker */
+        .custom-date-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        .date-picker-native {
+            position: absolute;
+            right: 0;
+            width: 24px;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* 2-row dotted line style for Name of Examination */
+        .exam-wrapper {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 10px;
+            font-size: 11pt;
+        }
+
+        .exam-wrapper label {
+            white-space: nowrap;
+            font-weight: bold;
+        }
+
+        .dots-textarea-2lines {
+            flex-grow: 1;
+            border: none;
+            outline: none;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+            line-height: 24px;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 23px,
+                #000 23px,
+                #000 24px
+            );
+            background-image: linear-gradient(to right, #000 25%, rgba(255, 255, 255, 0) 0%);
+            background-position: 0 23px, 0 47px;
+            background-size: 4px 1px;
+            background-repeat: repeat-x;
+            resize: none;
+            height: 48px;
+            overflow: hidden;
+            padding: 0 5px;
+            box-sizing: border-box;
+        }
+
+        .inline-fields {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .inline-fields .field-group {
+            display: flex;
+            align-items: baseline;
+        }
+
+        table.attendance-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            margin-bottom: 20px;
+        }
+
+        table.attendance-table th, 
+        table.attendance-table td {
+            border: 1px solid #000;
+            padding: 6px 5px;
+            text-align: left;
+            font-size: 10.5pt;
+        }
+
+        table.attendance-table th {
+            text-align: center;
+            font-weight: bold;
+            background-color: #e6e6e6;
+            vertical-align: middle;
+        }
+
+        .col-no { width: 5%; text-align: center !important; }
+        .col-name { width: 30%; }
+        .col-nic { width: 22%; }
+        .col-dept { width: 17%; }
+        .col-role { width: 11%; text-align: center !important; }
+        .col-sig { width: 15%; }
+
+        select.select-name, select.select-supervisor, select.select-hall {
+            width: 100%;
+            border: none;
+            background: transparent;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 10.5pt;
+            outline: none;
+            cursor: pointer;
+        }
+
+        select.select-hall {
+            font-size: 11pt;
+        }
+
+        input.table-input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 10.5pt;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        input.role-input {
+            font-weight: normal;
+            text-align: center;
+        }
+
+        .footer-section {
+            margin-top: 25px;
+            font-size: 11pt;
+            line-height: 1.8;
+        }
+
+        .cert-bold {
+            font-weight: bold;
+        }
+
+        .signature-block {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .signature-line {
+            text-align: center;
+        }
+
+        .signature-dots {
+            display: inline-block;
+            width: 200px;
+            border-bottom: 1px dotted #000;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls-bar no-print">
+        <span style="font-weight: bold; font-family: Arial, sans-serif;">Examination Staff Attendance Generator</span>
+        <button class="btn" onclick="window.print()">Print / Save PDF</button>
+    </div>
+
+    <div class="document-container">
+       
+        <!-- Header Section -->
+        <div class="header-title">
+            <h2>University of Jaffna – Sri Lanka</h2>
+            <h3>Examination Staff Attendance</h3><br>
+        </div>
+        
+        <!-- Document Fields -->
+        <div class="form-row">
+            <label>Deputy Registrar/ Examinations</label>
+        </div>        
+        
+        <!-- Name of Examination -->
+        <div class="exam-wrapper">
+            <label>Name of Examination:&nbsp;</label>
+            <textarea class="dots-textarea-2lines" id="exam-name" rows="2"></textarea>
+        </div>
+
+        <!-- Examination Hall Dropdown -->
+        <div class="form-row">
+            <label>Examination Hall&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp;</label>
+            <select id="hall-select" class="select-hall dots-input">
+                <option value="">-- Select Examination Hall --</option>
+                <option value="Computer Unit- Lab1">Computer Unit- Lab1</option>
+                <option value="Computer Unit- Lab2">Computer Unit- Lab2</option>
+                <option value="Computer Unit- Lab3">Computer Unit- Lab3</option>
+                <option value="Computer Unit- Lab4">Computer Unit- Lab4</option>
+                <option value="Computer Unit- Lab5">Computer Unit- Lab5</option>
+                <option value="CUL 2">CUL 1</option>
+		<option value="CUL 2">CUL 2</option>
+            </select>
+        </div>
+
+        <!-- Date & Time Selectors -->
+        <div class="inline-fields" style="margin-top: 10px;">
+            <div class="field-group" style="width: 48%;">
+                <label><b>Date</b> :&nbsp;</label>
+                <div class="custom-date-container">
+                    <input type="text" id="main-date-display" class="dots-input" placeholder="DD/MM/YYYY" readonly onclick="document.getElementById('main-date-picker').showPicker()">
+                    <input type="date" id="main-date-picker" class="date-picker-native" onchange="handleDateChange(this.value)">
+                </div>
+            </div>
+            <div class="field-group" style="width: 48%;">
+                <label><b>Time</b> :&nbsp;</label>
+                <input type="time" class="dots-input" style="max-width: 100px;">
+		<label>&nbsp;–&nbsp;</label>
+                <input type="time" class="dots-input" style="max-width: 100px;">
+            </div>
+        </div>
+
+        <!-- Attendance Table -->
+        <table class="attendance-table">
+            <thead>
+                <tr>
+                    <th class="col-no">No</th>
+                    <th class="col-name">Name</th>
+                    <th class="col-nic">N.I.C No</th>
+                    <th class="col-dept">Department</th>
+                    <th class="col-role">Invi/TO<br>/LA/HA</th>
+                    <th class="col-sig">Signature</th>
+                </tr>
+            </thead>
+            <tbody id="attendance-tbody">
+            </tbody>
+        </table>
+
+        <!-- Footer / Certification -->
+        <div class="footer-section">
+            <div class="cert-bold">I certify that the above Invigilators/ Technical Officers/ Lab.Attendant/ Hall Attendant have been on</div>
+            
+            <div class="form-row" style="margin-top: 8px;">
+                <label>Examination duty today from&nbsp;</label>
+                <input type="time" class="dots-input" style="max-width: 150px;">
+                <label>&nbsp;to&nbsp;</label>
+                <input type="time" class="dots-input" style="max-width: 150px;">
+            </div>
+
+            <!-- Name of Supervisor -->
+            <div class="form-row" style="margin-top: 8px;">
+                <label>Name of Supervisor:&nbsp;</label>
+                <select id="supervisor-select" class="select-supervisor dots-input">
+                    <option value="">-- Select Supervisor --</option>
+                </select>
+            </div>
+
+            <div class="signature-block">
+                <div class="form-row" style="margin-bottom: 0;">
+                    <label>Date:&nbsp;</label>
+                    <div class="custom-date-container" style="width: 160px; flex-grow: 0;">
+                        <input type="text" id="footer-date-display" class="dots-input" placeholder="DD/MM/YYYY" readonly onclick="document.getElementById('footer-date-picker').showPicker()">
+                        <input type="date" id="footer-date-picker" class="date-picker-native" onchange="handleFooterDateChange(this.value)">
+                    </div>
+                </div>
+                <div class="signature-line">
+                    <span class="signature-dots"></span><br>
+                    <span style="font-weight: bold;">Signature of Supervisor</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const academicStaffSupervisors = [
+            { name: "Mr. Kaneshanathan Ananthakrishnan", nic: "741492547V" },
+            { name: "Ms. Pavalarani Balendren", nic: "197162702109" },
+            { name: "Ms. Surendranathan Varnarubiny", nic: "757151774V" },
+            { name: "Ms. Subashini Aravinthan", nic: "745531903V" },
+            { name: "Mr. Sivapathasundaram Sivaskaran", nic: "710490430V" },
+            { name: "Mr. Sivasubramaniam Sivaraj", nic: "773040206V" },
+            { name: "Mr. Rameshwaran Sanjeevan", nic: "863460166V" },
+            { name: "Mr. Vadivel Aravinthan", nic: "823351755V" },
+            { name: "Mr. Poopalasingam Kobikrishna", nic: "843470297V" },
+            { name: "Mr. V. Sasikumar", nic: "731591121V" },
+            { name: "Mrs. B. Mathuraj", nic: "925763659V" },
+            { name: "Mr. M. Kohulan", nic: "870021267V" },
+            { name: "Mrs. L. Sulaxan", nic: "958380445V" },
+            { name: "Mr. T. Kirupathiran", nic: "841243242V" },
+            { name: "Mr. Y. Achchuthan", nic: "900733550V" }
+        ];
+
+        const staffData = [
+            { name: "Mr. Arasanayagam Jeyakanth", nic: "882910970V", designation: "Technical Officer, Staff Technical Officer, Gr.II" },
+            { name: "Mr. Arumainayagam Kokulan", nic: "911501929V", designation: "Technical Officer, Gr. II, Sec A" },
+            { name: "Mr. Suppaiah Suthakaran", nic: "198223103850", designation: "Laboratory Attendant, Lower Grade" },
+            { name: "Mr. Pulendren Jeyakaran", nic: "802915578V", designation: "Worksaids, Gr. II" },
+            { name: "Mr. Kasippillai Saththiyakumar", nic: "197304000000", designation: "Laboratory Attendant, Gr. I" },
+            { name: "Mr. Kanakathambirasa Manalan", nic: "198135100464", designation: "Laboratory Attendant, Gr. III" },
+            { name: "Mr. Punniyamoorthy Mayuran", nic: "901792895V", designation: "Technical officer (ICT), Gr.III" },
+            { name: "Mr. Rafeek Sibrikhan", nic: "199834000000", designation: "Temporary Instructor" },
+            { name: "Mr. Uthayakumar Kirushanth", nic: "200031001040", designation: "Temporary Instructor" },
+            { name: "Miss. Henrich Ravi Ann Kishanthi", nic: "997383885V", designation: "Temporary Instructor" },
+            { name: "Mr. Sathasivam Nerujan", nic: "199912000000", designation: "Temporary Instructor" },
+            { name: "Miss. Varsha Thayananthan", nic: "998023360V", designation: "Temporary Instructor" },
+            { name: "Mr. Thanendran Sivaparan", nic: "981832590V", designation: "Temporary Instructor" },
+            { name: "Mr. Manokararasa Karthikan", nic: "992491949V", designation: "Temporary Instructor" },
+            { name: "Mr. Selvarasa Tharsan", nic: "971972912V", designation: "Temporary Instructor" },
+            { name: "Ms. Anat Sutharsica Rajakumar", nic: "997931920V", designation: "Temporary Instructor" },
+            { name: "Mr. Sutheskumar Piriyaluxan", nic: "200030000000", designation: "Temporary Instructor" },
+            { name: "Ms. Piviththira Paramaseelan", nic: "200081000000", designation: "Temporary Instructor" },
+            { name: "Ms. Kulaksiga Jogeshwaran", nic: "958600178V", designation: "Temporary Instructor" },
+            { name: "Mr. Dominic Xavidhar Diron De Mel", nic: "993061166V", designation: "Temporary Instructor" },
+            { name: "Mr. Thevarajan Jeevathuvarakan", nic: "200036000000", designation: "Temporary Instructor" }
+        ];
+
+        function formatDateToDDMMYYYY(isoDateString) {
+            if (!isoDateString) return "";
+            const parts = isoDateString.split("-");
+            if (parts.length === 3) {
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+            return isoDateString;
+        }
+
+        function handleDateChange(isoValue) {
+            const formatted = formatDateToDDMMYYYY(isoValue);
+            document.getElementById('main-date-display').value = formatted;
+            document.getElementById('footer-date-display').value = formatted;
+            document.getElementById('footer-date-picker').value = isoValue;
+        }
+
+        function handleFooterDateChange(isoValue) {
+            const formatted = formatDateToDDMMYYYY(isoValue);
+            document.getElementById('footer-date-display').value = formatted;
+        }
+
+        function getRoleByDesignation(designation) {
+            if (!designation) return "";
+            const des = designation.toLowerCase();
+            if (des.includes("technical officer")) {
+                return "TO";
+            } else if (des.includes("laboratory attendant") || des.includes("lab attendant")) {
+                return "LA";
+            } else {
+                return "Invi";
+            }
+        }
+
+        function initSupervisors() {
+            const supervisorSelect = document.getElementById('supervisor-select');
+            supervisorSelect.innerHTML = '<option value="">-- Select Supervisor --</option>';
+            academicStaffSupervisors.forEach(staff => {
+                const opt = document.createElement('option');
+                opt.value = `${staff.name} (${staff.nic})`;
+                opt.textContent = `${staff.name} (${staff.nic})`;
+                supervisorSelect.appendChild(opt);
+            });
+        }
+
+        function initTableRows() {
+            const tbody = document.getElementById('attendance-tbody');
+            tbody.innerHTML = '';
+
+            for (let i = 1; i <= 12; i++) {
+                const tr = document.createElement('tr');
+
+                const tdNo = document.createElement('td');
+                tdNo.className = 'col-no';
+                tdNo.textContent = String(i).padStart(2, '0');
+                tr.appendChild(tdNo);
+
+                const tdName = document.createElement('td');
+                tdName.className = 'col-name';
+                const select = document.createElement('select');
+                select.className = 'select-name';
+                select.dataset.rowIndex = i;
+
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = "";
+                defaultOpt.textContent = "";
+                select.appendChild(defaultOpt);
+
+                staffData.forEach(staff => {
+                    const opt = document.createElement('option');
+                    opt.value = staff.name;
+                    opt.textContent = staff.name;
+                    select.appendChild(opt);
+                });
+
+                select.addEventListener('change', (e) => onNameChange(e.target, i));
+                tdName.appendChild(select);
+                tr.appendChild(tdName);
+
+                const tdNic = document.createElement('td');
+                tdNic.className = 'col-nic';
+                const inputNic = document.createElement('input');
+                inputNic.type = 'text';
+                inputNic.className = 'table-input';
+                inputNic.id = `nic-${i}`;
+                tdNic.appendChild(inputNic);
+                tr.appendChild(tdNic);
+
+                const tdDept = document.createElement('td');
+                tdDept.className = 'col-dept';
+                const inputDept = document.createElement('input');
+                inputDept.type = 'text';
+                inputDept.className = 'table-input';
+                inputDept.id = `dept-${i}`;
+                tdDept.appendChild(inputDept);
+                tr.appendChild(tdDept);
+
+                const tdRole = document.createElement('td');
+                tdRole.className = 'col-role';
+                const inputRole = document.createElement('input');
+                inputRole.type = 'text';
+                inputRole.className = 'table-input role-input';
+                inputRole.id = `role-${i}`;
+                tdRole.appendChild(inputRole);
+                tr.appendChild(tdRole);
+
+                const tdSig = document.createElement('td');
+                tdSig.className = 'col-sig';
+                const inputSig = document.createElement('input');
+                inputSig.type = 'text';
+                inputSig.className = 'table-input';
+                tdSig.appendChild(inputSig);
+                tr.appendChild(tdSig);
+
+                tbody.appendChild(tr);
+            }
+        }
+
+        function onNameChange(selectElement, rowIndex) {
+            const selectedName = selectElement.value;
+            const nicInput = document.getElementById(`nic-${rowIndex}`);
+            const deptInput = document.getElementById(`dept-${rowIndex}`);
+            const roleInput = document.getElementById(`role-${rowIndex}`);
+
+            if (!selectedName) {
+                nicInput.value = '';
+                deptInput.value = '';
+                roleInput.value = '';
+                return;
+            }
+
+            const staffObj = staffData.find(s => s.name === selectedName);
+            if (staffObj) {
+                nicInput.value = staffObj.nic || '';
+                deptInput.value = 'Computer Unit';
+                roleInput.value = getRoleByDesignation(staffObj.designation);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initSupervisors();
+            initTableRows();
+        });
+    </script>
+</body>
+</html>

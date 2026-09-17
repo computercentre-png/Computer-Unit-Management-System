@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Letter Generator & Sheet Logger</title>
+  <style>
+    :root {
+      --primary: #0056b3;
+      --primary-hover: #004085;
+      --bg: #f4f6f9;
+      --card-bg: #ffffff;
+      --text: #333333;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      text-align: center;
+      color: var(--primary);
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 15px;
+      margin-top: 24px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: bold;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-letter {
+      background-color: var(--primary);
+    }
+    .btn-letter:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-sheet {
+      background-color: #28a745;
+    }
+    .btn-sheet:hover {
+      background-color: #218838;
+    }
+
+    /* Print / Preview Styling */
+    #letter-preview {
+      display: none;
+      margin-top: 40px;
+      padding: 40px;
+      border: 1px solid #ddd;
+      background: #fff;
+      line-height: 1.6;
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 16px;
+    }
+
+    .letter-header {
+      margin-bottom: 20px;
+    }
+
+    .signature-space {
+      margin-top: 50px;
+    }
+
+    .status-msg {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
+      text-align: center;
+    }
+    .status-success { background: #d4edda; color: #155724; }
+    .status-error { background: #f8d7da; color: #721c24; }
+
+    @media print {
+  /* Hides default browser header (title/date) and footer (URL/page numbers) */
+  @page {
+    margin: 0;
+    size: auto;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #letter-preview, #letter-preview * {
+    visibility: visible;
+  }
+
+  #letter-preview {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none;
+    /* Adds internal margin so content doesn't touch the paper edges */
+    padding: 20mm 20mm; 
+    box-sizing: border-box;
+  }
+}
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>Payment Entry Form</h2>
+    
+    <form id="paymentForm">
+      <div class="form-group">
+        <label for="date">Date:</label>
+        <input type="text" id="date" placeholder="e.g., 12.08.2026" required>
+      </div>
+
+      <div class="form-group">
+        <label for="workshopName">Workshop Name:</label>
+        <input type="text" id="workshopName" placeholder="e.g., AI & IOT" required>
+      </div>
+
+      <div class="form-group">
+        <label for="details">Organized By (Details):</label>
+        <input type="text" id="details" placeholder="e.g., Institute of physics" required>
+      </div>
+
+      <div class="form-group">
+        <label for="amount">Amount (Rs.):</label>
+        <input type="text" id="amount" placeholder="e.g., 15,000.00" required>
+      </div>
+
+      <div class="form-group">
+        <label for="chqNo">Cheque No (Chq.No):</label>
+        <input type="text" id="chqNo" placeholder="e.g., 897645" required>
+      </div>
+
+      <div class="btn-group">
+        <button type="button" class="btn-letter" onclick="generateLetter()">Button 1: Create Letter</button>
+        <button type="button" class="btn-sheet" onclick="saveToSheet()">Button 2: Save to Google Sheet</button>
+      </div>
+    </form>
+
+    <div id="statusMsg" class="status-msg"></div>
+
+    <!-- Generated Letter Document -->
+    <div id="letter-preview">
+      <div class="letter-header">
+        Head,<br>
+        Computer Unit,<br>
+        University of Jaffna.<br>
+        <span id="lblDate"></span>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        Bursar,<br>
+        University of Jaffna.
+      </div>
+
+      <p>Dear Sir,</p>
+
+      <p style="font-weight: bold; text-decoration: underline;">
+        Computer Usage Payment – <span id="lblWorkshop"></span>
+      </p>
+
+      <p style="text-align: justify;">
+        Herewith, I have attached the payment cheque (No: <span id="lblChqNo"></span>) of Rs. <span id="lblAmount"></span> for utilizing the computers for conducting <span id="lblWorkshop2"></span> workshop, organized by the <span id="lblDetails"></span>.
+      </p>
+
+      <p style="text-align: justify;">
+        Kindly deposit the above-mentioned amount to the “Computer Development Fund” (reference number 500092) at your earliest convenience.
+      </p>
+
+      <p>Thank you.</p>
+
+      <div class="signature-space">
+        …………………………………….<br>
+        Head / Computer Unit
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbFRxHcdJuRlmfwfjkpuSK9-iuVU_KwfntnfxEzYZtWU7vAXds5jL2Zv3efVb_bI1jKg/exec";
+
+    function getFormData() {
+      return {
+        date: document.getElementById('date').value.trim(),
+        workshopName: document.getElementById('workshopName').value.trim(),
+        details: document.getElementById('details').value.trim(),
+        amount: document.getElementById('amount').value.trim(),
+        chqNo: document.getElementById('chqNo').value.trim()
+      };
+    }
+
+    function generateLetter() {
+      const data = getFormData();
+      
+      if (!data.date || !data.workshopName || !data.details || !data.amount || !data.chqNo) {
+        alert("Please fill in all form fields before generating the letter.");
+        return;
+      }
+
+      document.getElementById('lblDate').innerText = data.date;
+      document.getElementById('lblWorkshop').innerText = data.workshopName;
+      document.getElementById('lblWorkshop2').innerText = data.workshopName;
+      document.getElementById('lblChqNo').innerText = data.chqNo;
+      document.getElementById('lblAmount').innerText = data.amount;
+      document.getElementById('lblDetails').innerText = data.details;
+
+      const preview = document.getElementById('letter-preview');
+      preview.style.display = 'block';
+      preview.scrollIntoView({ behavior: 'smooth' });
+
+      setTimeout(() => { window.print(); }, 500);
+    }
+
+    function saveToSheet() {
+      const data = getFormData();
+
+      if (!data.date || !data.workshopName || !data.details || !data.amount || !data.chqNo) {
+        alert("Please fill in all form fields before saving to Google Sheets.");
+        return;
+      }
+
+      const statusMsg = document.getElementById('statusMsg');
+      statusMsg.className = "status-msg";
+      statusMsg.style.display = "block";
+      statusMsg.innerText = "Saving data to Google Sheet...";
+
+      fetch(GOOGLE_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      })
+      .then(() => {
+        statusMsg.className = "status-msg status-success";
+        statusMsg.innerText = "Successfully appended new line to Google Sheet!";
+      })
+      .catch(error => {
+        statusMsg.className = "status-msg status-error";
+        statusMsg.innerText = "Error saving data: " + error.message;
+      });
+    }
+  </script>
+</body>
+</html>

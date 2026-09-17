@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Drive Uploader</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 650px; margin: 40px auto; padding: 20px; background: #f9f9f9; color: #333; }
+        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); box-sizing: border-box; width: 100%; }
+        h2 { margin-top: 0; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; }
+        
+        /* Flexbox alignment fix */
+        .folder-row { display: flex; gap: 8px; width: 100%; align-items: center; }
+        select { flex: 1; min-width: 0; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: monospace; }
+        
+        input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 600; }
+        button:hover { background: #1557b0; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-full { width: 100%; }
+        .btn-secondary { background: #5f6368; padding: 10px 14px; font-size: 14px; white-space: nowrap; flex-shrink: 0; }
+        .btn-secondary:hover { background: #3c4043; }
+        #progress-container { display: none; margin-top: 20px; }
+        #progress-bar { width: 100%; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+        #progress-fill { height: 20px; background: #34a853; width: 0%; transition: width 0.2s; }
+        #status-message { margin-top: 10px; font-size: 14px; text-align: center; }
+        .error-log { color: #d93025; background: #fce8e6; padding: 10px; border-radius: 4px; font-size: 13px; margin-top: 15px; white-space: pre-wrap; word-break: break-word; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>Document Uploader</h2>
+        <p>Authenticate to upload directly into the shared organizational drive.</p>
+        
+        <button id="auth-btn" class="btn-full" onclick="handleAuthClick()">Authorize Google Drive</button>
+        <button id="signout-btn" class="btn-full hidden" onclick="handleSignoutClick()">Sign Out</button>
+
+        <div id="upload-section" class="hidden">
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+            
+            <div class="form-group">
+                <label for="folder-select">Target Folder Structure</label>
+                <div class="folder-row">
+                    <select id="folder-select">
+                        <option value="">Loading structure...</option>
+                    </select>
+                    <button type="button" class="btn-secondary" onclick="loadFolderTreeFast()" title="Refresh folder tree">🔄 Refresh</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="file-input">Select Document</label>
+                <input type="file" id="file-input">
+            </div>
+
+            <button id="upload-btn" class="btn-full" onclick="startUpload()">Upload Document</button>
+
+            <div id="progress-container">
+                <div id="progress-bar"><div id="progress-fill"></div></div>
+                <div id="status-message">Starting upload...</div>
+            </div>
+        </div>
+        <div id="error-box" class="error-log hidden"></div>
+    </div>
+
+    <!-- Google API & Identity Services -->
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+
+    <script>
+        const CLIENT_ID = '820281012007-6512ohceo24ntafa40827fdlk5guouha.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyDRQuS69ufRIUpNGgRnktPqCgaIz2E5p90';
+        const ROOT_FOLDER_ID = '1sqkpSHRjoi6354uke9zfYKpc1PIKjTlC';
+        const SCOPES = 'https://www.googleapis.com/auth/drive';
+
+        let tokenClient;
+        let accessToken = null;
+        let gapiInited = false;
+        let gisInited = false;
+
+        function showError(msg) {
+            const errBox = document.getElementById('error-box');
+            errBox.textContent = msg;
+            errBox.classList.remove('hidden');
+        }
+
+        function clearError() {
+            const errBox = document.getElementById('error-box');
+            errBox.textContent = '';
+            errBox.classList.add('hidden');
+        }
+
+        function gapiLoaded() {
+            gapi.load('client', () => {
+                gapi.client.init({ apiKey: API_KEY }).then(() => {
+                    gapiInited = true;
+                    maybeEnableButtons();
+                }).catch(err => showError('GAPI Init Error: ' + JSON.stringify(err)));
+            });
+        }
+
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (resp) => {
+                    if (resp.error !== undefined) {
+                        showError('Auth Error: ' + resp.error);
+                        throw resp;
+                    }
+                    accessToken = resp.access_token;
+                    gapi.client.setToken({ access_token: accessToken });
+
+                    document.getElementById('auth-btn').classList.add('hidden');
+                    document.getElementById('signout-btn').classList.remove('hidden');
+                    document.getElementById('upload-section').classList.remove('hidden');
+                    loadFolderTreeFast();
+                },
+            });
+            gisInited = true;
+            maybeEnableButtons();
+        }
+
+        function maybeEnableButtons() {
+            if (gapiInited && gisInited) {
+                document.getElementById('auth-btn').disabled = false;
+            }
+        }
+
+        function handleAuthClick() {
+            clearError();
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+        }
+
+        function handleSignoutClick() {
+            if (accessToken) {
+                google.accounts.oauth2.revoke(accessToken, () => {
+                    accessToken = null;
+                    gapi.client.setToken(null);
+                    document.getElementById('auth-btn').classList.remove('hidden');
+                    document.getElementById('signout-btn').classList.add('hidden');
+                    document.getElementById('upload-section').classList.add('hidden');
+                });
+            }
+        }
+
+        async function loadFolderTreeFast() {
+            const select = document.getElementById('folder-select');
+            select.innerHTML = '<option value="">Syncing latest folders...</option>';
+            clearError();
+
+            try {
+                let allFolders = [];
+                let pageToken = null;
+
+                do {
+                    const response = await gapi.client.request({
+                        path: 'https://www.googleapis.com/drive/v3/files',
+                        method: 'GET',
+                        params: {
+                            q: "mimeType='application/vnd.google-apps.folder' and trashed=false",
+                            fields: 'nextPageToken, files(id, name, parents)',
+                            pageSize: 1000,
+                            pageToken: pageToken,
+                            supportsAllDrives: true,
+                            includeItemsFromAllDrives: true
+                        }
+                    });
+
+                    if (response.result && response.result.files) {
+                        allFolders = allFolders.concat(response.result.files);
+                    }
+                    pageToken = response.result.nextPageToken;
+                } while (pageToken);
+
+                const childrenMap = {};
+                allFolders.forEach(folder => {
+                    if (folder.parents) {
+                        folder.parents.forEach(pId => {
+                            if (!childrenMap[pId]) childrenMap[pId] = [];
+                            childrenMap[pId].push(folder);
+                        });
+                    }
+                });
+
+                const orderedFolders = [];
+                function traverse(parentId, level) {
+                    let children = childrenMap[parentId] || [];
+                    children.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+                    for (let child of children) {
+                        orderedFolders.push({ id: child.id, name: child.name, level: level });
+                        traverse(child.id, level + 1);
+                    }
+                }
+
+                traverse(ROOT_FOLDER_ID, 0);
+
+                const displayFolders = orderedFolders.length > 0 ? orderedFolders : allFolders.map(f => ({ id: f.id, name: f.name, level: 0 }));
+                if (orderedFolders.length === 0) {
+                    displayFolders.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+                }
+
+                select.innerHTML = '<option value="">-- Select Target Folder --</option>';
+
+                if (displayFolders.length > 0) {
+                    displayFolders.forEach(folder => {
+                        const option = document.createElement('option');
+                        option.value = folder.id;
+                        const indent = "\u00A0\u00A0\u00A0\u00A0".repeat(folder.level);
+                        const prefix = folder.level > 0 ? "└─ " : "";
+                        option.textContent = indent + prefix + folder.name;
+                        select.appendChild(option);
+                    });
+                } else {
+                    select.innerHTML = '<option value="">No folders found</option>';
+                }
+
+            } catch (err) {
+                console.error(err);
+                const errMsg = err.result?.error?.message || err.message || JSON.stringify(err);
+                showError('Drive API Error: ' + errMsg);
+                select.innerHTML = '<option value="">Error loading structure</option>';
+            }
+        }
+
+        async function startUpload() {
+            const fileInput = document.getElementById('file-input');
+            const folderSelect = document.getElementById('folder-select');
+            const file = fileInput.files[0];
+            const folderId = folderSelect.value;
+
+            if (!file) return alert("Please select a file.");
+            if (!folderId) return alert("Please select a target folder.");
+
+            const uiContainer = document.getElementById('progress-container');
+            const uiFill = document.getElementById('progress-fill');
+            const uiMsg = document.getElementById('status-message');
+            const uploadBtn = document.getElementById('upload-btn');
+            
+            uiContainer.style.display = 'block';
+            uiFill.style.width = '0%';
+            uiMsg.style.color = '#333';
+            uiMsg.textContent = 'Initiating upload...';
+            uploadBtn.disabled = true;
+
+            const metadata = {
+                name: file.name,
+                parents: [folderId]
+            };
+
+            try {
+                const initRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                        'X-Upload-Content-Type': file.type,
+                        'X-Upload-Content-Length': file.size
+                    },
+                    body: JSON.stringify(metadata)
+                });
+
+                if (!initRes.ok) throw new Error('Failed to initialize upload session.');
+                const locationUrl = initRes.headers.get('Location');
+
+                const xhr = new XMLHttpRequest();
+                xhr.open('PUT', locationUrl, true);
+                xhr.setRequestHeader('Content-Type', file.type);
+                
+                xhr.upload.onprogress = (event) => {
+                    if (event.lengthComputable) {
+                        const percentComplete = Math.round((event.loaded / event.total) * 100);
+                        uiFill.style.width = percentComplete + '%';
+                        uiMsg.textContent = `Uploading: ${percentComplete}%`;
+                    }
+                };
+
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        uiFill.style.width = '100%';
+                        uiMsg.textContent = `Success! "${file.name}" uploaded.`;
+                        uiMsg.style.color = '#34a853';
+                        fileInput.value = '';
+                    } else {
+                        uiMsg.textContent = `Upload failed: ${xhr.statusText}`;
+                        uiMsg.style.color = 'red';
+                    }
+                    uploadBtn.disabled = false;
+                };
+
+                xhr.onerror = () => {
+                    uiMsg.textContent = 'An error occurred during upload.';
+                    uiMsg.style.color = 'red';
+                    uploadBtn.disabled = false;
+                };
+
+                xhr.send(file);
+            } catch (error) {
+                console.error(error);
+                uiMsg.textContent = 'Upload failed. See console for details.';
+                uiMsg.style.color = 'red';
+                uploadBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

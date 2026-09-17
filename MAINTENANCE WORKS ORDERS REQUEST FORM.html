@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maintenance Works Orders Request Form</title>
+    
+    <!-- Flatpickr Datepicker CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    
+    <!-- html2pdf.js for PDF conversion -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Times New Roman", Times, serif;
+            color: #000;
+        }
+
+        body {
+            background-color: #f4f4f9;
+            padding: 20px;
+        }
+
+        .form-container {
+            max-width: 950px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 25px;
+            border: 2px solid #000;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        /* Removes container border during PDF export */
+        .form-container.no-border {
+            border: none !important;
+            box-shadow: none !important;
+            padding: 10px !important;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 1.3rem;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+
+        header h2 {
+            font-size: 1.1rem;
+            font-weight: normal;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        /* Input Grid Header */
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+
+        .info-table td {
+            border: 1px solid #000;
+            padding: 6px 10px;
+            font-size: 14px;
+            vertical-align: top;
+        }
+
+        .info-table td.label-col {
+            font-weight: bold;
+            width: 20%;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+
+        .info-table td.input-col {
+            width: 30%;
+            background-color: #fff;
+        }
+
+        .info-table input[type="text"] {
+            width: 100%;
+            border: none;
+            outline: none;
+            font-size: 14px;
+            background: transparent;
+        }
+
+        .info-table textarea.auto-wrap {
+            width: 100%;
+            border: none;
+            outline: none;
+            font-size: 14px;
+            background: transparent;
+            resize: none; 
+            overflow-y: hidden; 
+            font-family: inherit;
+            line-height: 1.4;
+            height: 38px; 
+            display: block;
+            vertical-align: top;
+        }
+
+        .info-table input.date-input::placeholder {
+            color: #888;
+            font-style: italic;
+        }
+
+        /* Priority Section */
+        .priority-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .priority-table td {
+            border: 0px solid #000;
+            padding: 8px 12px;
+            font-size: 14px;
+            vertical-align: top;
+            width: 50%;
+        }
+
+        .section-heading {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        /* Works Section */
+        .works-heading {
+            font-size: 17px;
+            font-weight: bold;
+            margin: 15px 0 8px 0;
+        }
+
+        .works-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #000;
+            margin-bottom: 20px;
+        }
+
+        .works-table td {
+            border: 1px solid #000;
+            padding: 4px 6px;
+            font-size: 13px;
+            vertical-align: middle;
+        }
+
+        .work-desc-col { width: 31%; line-height: 1.2; }
+        .work-code-col { width: 14%; font-weight: bold; white-space: nowrap; }
+        .work-check-col { width: 5%; text-align: center; }
+
+        .work-check-col input[type="checkbox"] {
+            width: 16px; height: 16px; cursor: pointer; display: block; margin: 0 auto;
+        }
+
+        /* Problem Description Section */
+        .description-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .description-table td {
+            border: 1px solid #000;
+            padding: 6px 8px;
+            vertical-align: top !important;
+            height: 95px;
+        }
+
+        .problem-textarea {
+            width: 100%;
+            height: 85px;
+            border: none;
+            outline: none;
+            resize: none;
+            font-size: 14px;
+            font-family: "Times New Roman", Times, serif;
+            line-height: 1.3;
+            display: block;
+            padding: 0;
+            margin: 0;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        /* Temporary PDF display div for top-left aligned text */
+        .pdf-text-display {
+            width: 100%;
+            min-height: 85px;
+            font-size: 14px;
+            font-family: "Times New Roman", Times, serif;
+            line-height: 1.3;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            text-align: left;
+            vertical-align: top;
+            display: block;
+        }
+
+        /* Signature Footer */
+        .signature-container {
+            text-align: left;
+            padding-top: 40px;
+            padding-left: 20px;
+        }
+
+        .signature-line {
+            display: inline-block;
+            border-top: 1px dotted #000;
+            width: 240px;
+            text-align: center;
+            padding-top: 4px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Action Buttons */
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            color: #fff;
+            border: none;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 3px;
+            text-align: center;
+        }
+
+        .btn-print { background-color: #4CAF50; }
+        .btn-print:hover { background-color: #45a049; }
+
+        .btn-send { background-color: #000; }
+        .btn-send:hover { background-color: #333; }
+        
+        .loading-text {
+            display: none;
+            text-align: center;
+            font-weight: bold;
+            margin-top: 15px;
+            color: #0056b3;
+        }
+
+        /* Hide Buttons & Clean formatting during Browser Print */
+        @media print {
+            body { background-color: #fff; padding: 0; margin: 0; }
+            @page { margin: 0; }
+            .form-container { border: none; box-shadow: none; padding: 20px; width: 100%; }
+            .button-group, .loading-text { display: none !important; }
+            .html2pdf__container .button-group { display: none !important;}
+        }
+    </style>
+</head>
+<body>
+
+<div class="form-container" id="form-container">
+    <header>
+        <h1>MAINTENANCE WORKS ORDERS REQUEST FORM</h1>
+        <h2>ENGINEERING SERVICES DIVISION</h2>
+    </header>
+
+    <form id="maintenance-form">
+        <!-- Top Info Grid -->
+        <table class="info-table">
+            <tr>
+                <td class="label-col">Date of Request</td>
+                <td class="input-col"><input type="text" class="date-input" id="date-request" name="date_request" placeholder="dd/mm/yyyy"></td>
+                <td class="label-col">Expecting Date</td>
+                <td class="input-col"><input type="text" class="date-input" id="expecting-date" name="expecting_date" placeholder="dd/mm/yyyy"></td>
+            </tr>
+            <tr>
+                <td class="label-col">Person making request</td>
+                <td class="input-col"><textarea class="auto-wrap" id="person-request" name="person_request"></textarea></td>
+                <td class="label-col">Location</td>
+                <td class="input-col"><textarea class="auto-wrap" id="location" name="location"></textarea></td>
+            </tr>
+        </table>
+
+        <!-- Priorities Section -->
+        <div class="section-heading">Priorities:</div>
+        <table class="priority-table">
+            <tr>
+                <td>
+                    <label class="checkbox-row">
+                        <span>1. Emergency must be done now</span>
+                        <input type="checkbox" name="priorities" value="Emergency">
+                    </label>
+                    <label class="checkbox-row">
+                        <span>2. Need to be done ASAP</span>
+                        <input type="checkbox" name="priorities" value="ASAP">
+                    </label>
+                    <label class="checkbox-row">
+                        <span>3. Perform as time and funds are available</span>
+                        <input type="checkbox" name="priorities" value="Available">
+                    </label>
+                </td>
+                <td>
+                    <label class="checkbox-row">
+                        <span>Civil Work</span>
+                        <input type="checkbox" name="work_types" value="Civil Work">
+                    </label>
+                    <label class="checkbox-row">
+                        <span>Electrical Work</span>
+                        <input type="checkbox" name="work_types" value="Electrical Work">
+                    </label>
+                    <label class="checkbox-row">
+                        <span>Mechanical Work</span>
+                        <input type="checkbox" name="work_types" value="Mechanical Work">
+                    </label>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Works Section -->
+        <div class="works-heading">Please tick of the following works</div>
+        <table class="works-table">
+            <tr>
+                <td class="work-desc-col">External power supply including main panel works</td>
+                <td class="work-code-col">ESD/PR/601</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/PR/601"></td>
+                <td class="work-desc-col">Masonry Work</td>
+                <td class="work-code-col">ESD/S/631</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/S/631"></td>
+            </tr>
+            <tr>
+                <td class="work-desc-col">Server Room</td>
+                <td class="work-code-col">ESD/PR/602</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/PR/602"></td>
+                <td class="work-desc-col">Painting Work</td>
+                <td class="work-code-col">ESD/S/632</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/S/632"></td>
+            </tr>
+            <tr>
+                <td class="work-desc-col">Generator Operation</td>
+                <td class="work-code-col">ESD/PR/603</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/PR/603"></td>
+                <td class="work-desc-col">Aluminum Work</td>
+                <td class="work-code-col">ESD/P1/641</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/P1/641"></td>
+            </tr>
+            <tr>
+                <td class="work-desc-col">Lift repair and Maintenance works</td>
+                <td class="work-code-col">ESD/PR/604</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/PR/604"></td>
+                <td class="work-desc-col">Carpentry Work</td>
+                <td class="work-code-col">ESD/P1/642</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/P1/642"></td>
+            </tr>
+            <tr>
+                <td class="work-desc-col">Air Conditioner repair and maintenance works</td>
+                <td class="work-code-col">ESD/PR/605</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/PR/605"></td>
+                <td class="work-desc-col">Welding Work</td>
+                <td class="work-code-col">ESD/P1/643</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/P1/643"></td>
+            </tr>
+            <tr>
+                <td class="work-desc-col">Motor services works</td>
+                <td class="work-code-col">ESD/PR/606</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/PR/606"></td>
+                <td class="work-desc-col">RO Plant maintenance works</td>
+                <td class="work-code-col">ESD/T/651</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/T/651"></td>
+            </tr>
+            <tr>
+                <td class="work-desc-col">Internal Electrical Work (Building)</td>
+                <td class="work-code-col">ESD/J/611</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/J/611"></td>
+                <td class="work-desc-col">STP maintenance works</td>
+                <td class="work-code-col">ESD/T/652</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/T/652"></td>
+            </tr>
+            <tr>
+                <td class="work-desc-col">Plumbing Work</td>
+                <td class="work-code-col">ESD/G/621</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/G/621"></td>
+                <td class="work-desc-col">Landscaping work</td>
+                <td class="work-code-col">ESD/T/653</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/T/653"></td>
+            </tr>
+            <tr>
+                <td class="work-desc-col">Pump Operating Work</td>
+                <td class="work-code-col">ESD/G/622</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/G/622"></td>
+                <td class="work-desc-col">Cleaning Service Monitoring works</td>
+                <td class="work-code-col">ESD/T/654</td>
+                <td class="work-check-col"><input type="checkbox" name="specific_works" value="ESD/T/654"></td>
+            </tr>
+        </table>
+
+        <!-- Problem Description Section -->
+        <div class="section-heading">Describe your problem / Request</div>
+        <table class="description-table">
+            <tr>
+                <td><textarea class="problem-textarea" id="problem-description" name="problem_description" placeholder="Write description here..."></textarea></td>
+            </tr>
+        </table>
+
+        <!-- Footer / Signature -->
+        <div class="signature-container">
+            <div class="signature-line">
+                Head of the Department
+            </div>
+        </div>
+
+        <!-- 2 Action Buttons -->
+        <div class="button-group">
+            <button type="button" class="btn btn-print" id="print-btn">Print</button>
+            <button type="button" class="btn btn-send" id="send-hod-btn">Send to HOD</button>
+        </div>
+    </form>
+</div>
+
+<!-- Outside form-container so it never appears in captured PDF -->
+<div class="loading-text" id="loading-text">Saving form, downloading PDF and triggering email notification... Please wait.</div>
+
+<!-- Flatpickr JS -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<!-- Firebase SDK -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, doc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBYurOydUiF-xZQGlPc5X0sBDNH3BkGcW4",
+      authDomain: "maintenance-work-request.firebaseapp.com",
+      projectId: "maintenance-work-request",
+      storageBucket: "maintenance-work-request.firebasestorage.app",
+      messagingSenderId: "135206668848",
+      appId: "1:135206668848:web:7cef83b745fe4c768fbbf5",
+      measurementId: "G-XEYXB1JXGQ"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZePUi7TjlyrNG93sFR2ZCsFhM-OFZn0kMQLfqpuPRA_wm3sGqqozCYoK7knJiWEjUOg/exec"; 
+
+    document.addEventListener("DOMContentLoaded", function() {
+        flatpickr(".date-input", { dateFormat: "d/m/Y", allowInput: true });
+
+        const printBtn = document.getElementById("print-btn");
+        const sendHodBtn = document.getElementById("send-hod-btn");
+        const loadingText = document.getElementById("loading-text");
+        const formContainer = document.getElementById("form-container");
+
+        printBtn.addEventListener("click", function() {
+            window.print();
+        });
+
+        sendHodBtn.addEventListener("click", async function() {
+            const personRequest = document.getElementById("person-request").value;
+            const location = document.getElementById("location").value;
+
+            if (!personRequest || !location) {
+                alert("Please fill in key details like 'Person making request' and 'Location'.");
+                return;
+            }
+
+            window.scrollTo(0, 0);
+
+            // Hide action buttons, hide container border, and display loading message
+            document.querySelector('.button-group').style.display = 'none';
+            formContainer.classList.add('no-border');
+            loadingText.style.display = "block";
+            sendHodBtn.disabled = true;
+
+            // Convert textarea into a plain div to ensure 100% top-left text alignment in PDF canvas
+            const problemTextarea = document.getElementById("problem-description");
+            const tempDiv = document.createElement("div");
+            tempDiv.className = "pdf-text-display";
+            tempDiv.innerText = problemTextarea.value;
+            
+            problemTextarea.style.display = "none";
+            problemTextarea.parentNode.appendChild(tempDiv);
+
+            const fileName = `Maintenance_Request_${personRequest.replace(/\s+/g, '_')}.pdf`;
+
+            const opt = {
+                margin:       0.3,
+                filename:     fileName,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, scrollY: 0, windowWidth: document.documentElement.offsetWidth },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            try {
+                const pdfBase64 = await html2pdf().set(opt).from(formContainer).output('datauristring');
+                const base64Data = pdfBase64.split(',')[1];
+                
+                const formData = new URLSearchParams();
+                formData.append("fileName", fileName);
+                formData.append("fileData", base64Data);
+
+                const driveResponse = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const driveResult = await driveResponse.json();
+                if (driveResult.status !== "success") {
+                    throw new Error("Failed to save to Google Drive: " + driveResult.message);
+                }
+                
+                const driveFileUrl = driveResult.fileUrl;
+
+                const dateRequest = document.getElementById("date-request").value;
+                const expectingDate = document.getElementById("expecting-date").value;
+                const problemDescription = problemTextarea.value;
+
+                const getCheckedValues = (name) => {
+                    return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(el => el.value);
+                };
+
+                const docRef = await addDoc(collection(db, "maintenance_requests"), {
+                    date_request: dateRequest,
+                    expecting_date: expectingDate,
+                    person_request: personRequest,
+                    location: location,
+                    problem_description: problemDescription,
+                    priorities: getCheckedValues("priorities"),
+                    work_types: getCheckedValues("work_types"),
+                    specific_works: getCheckedValues("specific_works"),
+                    drive_pdf_link: driveFileUrl,
+                    createdAt: serverTimestamp()
+                });
+
+                const formLink = window.location.origin + window.location.pathname + "?id=" + docRef.id;
+
+                await addDoc(collection(db, "mail"), {
+                    to: ["computer_centre@univ.jfn.ac.lk"],
+                    message: {
+                        subject: `New Maintenance Request from ${personRequest}`,
+                        html: `
+                            <h2>New Maintenance Works Order Request</h2>
+                            <p><strong>Requested By:</strong> ${personRequest}</p>
+                            <p><strong>Location:</strong> ${location}</p>
+                            <p>The PDF has been saved to Google Drive: <a href="${driveFileUrl}" target="_blank">View PDF in Drive</a></p>
+                            <p>Click the link below to view the interactive web form:</p>
+                            <p><a href="${formLink}" target="_blank">${formLink}</a></p>
+                        `
+                    }
+                });
+
+                alert("Success! Form saved to Google Drive and email sent HOD");
+            } catch (error) {
+                console.error("Error processing request: ", error);
+                alert("Error submitting request: " + error.message);
+            } finally {
+                // Remove temporary PDF div and show textarea again
+                if (tempDiv && tempDiv.parentNode) {
+                    tempDiv.parentNode.removeChild(tempDiv);
+                }
+                problemTextarea.style.display = "block";
+
+                formContainer.classList.remove('no-border');
+                document.querySelector('.button-group').style.display = 'flex';
+                loadingText.style.display = "none";
+                sendHodBtn.disabled = false;
+            }
+        });
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const docId = urlParams.get("id");
+
+        if (docId) {
+            getDoc(doc(db, "maintenance_requests", docId)).then((docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+
+                    document.getElementById("date-request").value = data.date_request || "";
+                    document.getElementById("expecting-date").value = data.expecting_date || "";
+                    document.getElementById("person-request").value = data.person_request || "";
+                    document.getElementById("location").value = data.location || "";
+                    document.getElementById("problem-description").value = data.problem_description || "";
+
+                    const setCheckboxes = (name, values) => {
+                        if (!values) return;
+                        document.querySelectorAll(`input[name="${name}"]`).forEach(cb => {
+                            if (values.includes(cb.value)) cb.checked = true;
+                        });
+                    };
+
+                    setCheckboxes("priorities", data.priorities);
+                    setCheckboxes("work_types", data.work_types);
+                    setCheckboxes("specific_works", data.specific_works);
+                }
+            }).catch(err => console.error("Error loading request:", err));
+        }
+    });
+</script>
+
+</body>
+</html>
