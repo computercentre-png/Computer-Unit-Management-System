@@ -11,7 +11,6 @@
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: 600; }
         
-        /* Flexbox alignment fix */
         .folder-row { display: flex; gap: 8px; width: 100%; align-items: center; }
         select { flex: 1; min-width: 0; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: monospace; }
         
@@ -113,12 +112,14 @@
                         throw resp;
                     }
                     accessToken = resp.access_token;
-                    gapi.client.setToken({ access_token: accessToken });
+                    
+                    // Save token and expiration timestamp (expires_in is in seconds)
+                    const expiresInMs = (resp.expires_in || 3600) * 1000;
+                    const expiryTime = Date.now() + expiresInMs;
+                    localStorage.setItem('gdrive_token', accessToken);
+                    localStorage.setItem('gdrive_token_expiry', expiryTime);
 
-                    document.getElementById('auth-btn').classList.add('hidden');
-                    document.getElementById('signout-btn').classList.remove('hidden');
-                    document.getElementById('upload-section').classList.remove('hidden');
-                    loadFolderTreeFast();
+                    applyTokenAndLoad();
                 },
             });
             gisInited = true;
@@ -128,15 +129,45 @@
         function maybeEnableButtons() {
             if (gapiInited && gisInited) {
                 document.getElementById('auth-btn').disabled = false;
+                checkSavedSession();
             }
+        }
+
+        // Restore active token from localStorage on page visit/refresh
+        function checkSavedSession() {
+            const savedToken = localStorage.getItem('gdrive_token');
+            const savedExpiry = localStorage.getItem('gdrive_token_expiry');
+
+            if (savedToken && savedExpiry) {
+                // Check if token is still valid (with 1-minute buffer)
+                if (Date.now() < (parseInt(savedExpiry) - 60000)) {
+                    accessToken = savedToken;
+                    applyTokenAndLoad();
+                } else {
+                    // Token expired; clear storage
+                    localStorage.removeItem('gdrive_token');
+                    localStorage.removeItem('gdrive_token_expiry');
+                }
+            }
+        }
+
+        function applyTokenAndLoad() {
+            gapi.client.setToken({ access_token: accessToken });
+            document.getElementById('auth-btn').classList.add('hidden');
+            document.getElementById('signout-btn').classList.remove('hidden');
+            document.getElementById('upload-section').classList.remove('hidden');
+            loadFolderTreeFast();
         }
 
         function handleAuthClick() {
             clearError();
-            tokenClient.requestAccessToken({ prompt: 'consent' });
+            tokenClient.requestAccessToken({ prompt: '' }); // Uses cached session seamlessly
         }
 
         function handleSignoutClick() {
+            localStorage.removeItem('gdrive_token');
+            localStorage.removeItem('gdrive_token_expiry');
+            
             if (accessToken) {
                 google.accounts.oauth2.revoke(accessToken, () => {
                     accessToken = null;
@@ -223,6 +254,15 @@
             } catch (err) {
                 console.error(err);
                 const errMsg = err.result?.error?.message || err.message || JSON.stringify(err);
+                
+                // If token expired on server side, clear and prompt login
+                if (err.status === 401) {
+                    localStorage.removeItem('gdrive_token');
+                    localStorage.removeItem('gdrive_token_expiry');
+                    document.getElementById('auth-btn').classList.remove('hidden');
+                    document.getElementById('upload-section').classList.add('hidden');
+                }
+                
                 showError('Drive API Error: ' + errMsg);
                 select.innerHTML = '<option value="">Error loading structure</option>';
             }
