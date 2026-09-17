@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Computer Unit Management System</title>
+<style>
+  :root{
+    --uoj-blue:#0d3b73;
+    --uoj-blue-dark:#082a54;
+    --uoj-gold:#c9a227;
+    --ink:#1c1f24;
+    --muted:#5c6570;
+    --line:#e4e7eb;
+    --bg:#ffffff;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    line-height:1.5;
+  }
+
+  a{ text-decoration:none; color:inherit; }
+
+  /* ---------- Header ---------- */
+  header{
+    border-bottom:3px solid var(--uoj-blue);
+    padding:28px 24px 22px;
+  }
+
+  .header-inner{
+    max-width:960px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    gap:20px;
+  }
+
+  .logo{
+    width:64px;
+    height:64px;
+    flex:none;
+    border-radius:4px;
+    object-fit:contain;
+  }
+
+  .logo-fallback{
+    width:64px;
+    height:64px;
+    flex:none;
+    border-radius:50%;
+    border:2px solid var(--uoj-blue);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    font-size:13px;
+    color:var(--uoj-blue);
+    letter-spacing:0.5px;
+  }
+
+  .titles .eyebrow{
+    margin:0 0 4px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  .titles h1{
+    margin:0;
+    font-size:clamp(22px, 3.2vw, 30px);
+    color:var(--uoj-blue-dark);
+    font-weight:700;
+    letter-spacing:0.2px;
+  }
+
+  /* ---------- Main ---------- */
+  main{
+    max-width:960px;
+    margin:0 auto;
+    padding:48px 24px 64px;
+  }
+
+  .intro{
+    max-width:58ch;
+    color:var(--muted);
+    margin:0 0 36px;
+    font-size:15.5px;
+  }
+
+  h2.section-title{
+    font-size:15px;
+    font-weight:700;
+    color:var(--uoj-blue-dark);
+    margin:0 0 18px;
+    padding-bottom:10px;
+    border-bottom:1px solid var(--line);
+  }
+
+  .services{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+    gap:16px;
+  }
+
+  .service-btn{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:18px 20px;
+    border:1px solid var(--line);
+    border-left:4px solid var(--uoj-blue);
+    border-radius:6px;
+    background:#fff;
+    transition:border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  }
+
+  .service-btn:hover,
+  .service-btn:focus-visible{
+    border-left-color:var(--uoj-gold);
+    box-shadow:0 4px 14px rgba(13,59,115,0.12);
+    transform:translateY(-1px);
+  }
+
+  .service-btn:focus-visible{
+    outline:2px solid var(--uoj-blue);
+    outline-offset:2px;
+  }
+
+  .service-icon{
+    flex:none;
+    width:38px;
+    height:38px;
+    border-radius:6px;
+    background:var(--uoj-blue);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    font-size:15px;
+  }
+
+  .service-label{
+    font-size:15px;
+    font-weight:600;
+    color:var(--ink);
+  }
+
+  .service-sub{
+    display:block;
+    font-weight:400;
+    font-size:12.5px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  .placeholder-note{
+    margin-top:28px;
+    font-size:13px;
+    color:var(--muted);
+    border-top:1px dashed var(--line);
+    padding-top:16px;
+  }
+
+  /* ---------- Footer ---------- */
+  footer{
+    border-top:1px solid var(--line);
+    padding:26px 24px;
+    background:#fafbfc;
+  }
+
+  .footer-inner{
+    max-width:960px;
+    margin:0 auto;
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    gap:10px;
+    font-size:13.5px;
+    color:var(--muted);
+  }
+
+  .footer-inner a{
+    color:var(--uoj-blue);
+    font-weight:600;
+  }
+
+  .footer-inner a:hover{ text-decoration:underline; }
+
+  @media (max-width:520px){
+    .header-inner{ flex-wrap:wrap; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <!--
+      Add your UOJ logo file (e.g. logo.png) to this same folder and
+      it will appear automatically. Until then, a placeholder badge
+      is shown below.
+    -->
+    <img
+      src="logo.png"
+      alt="University of Jaffna logo"
+      class="logo"
+      onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'logo-fallback',textContent:'UOJ'}))"
+    >
+    <div class="titles">
+      <p class="eyebrow">University of Jaffna</p>
+      <h1>Computer Unit Management System</h1>
+    </div>
+  </div>
+</header>
+
+<main>
+  
+  <h2 class="section-title">Services</h2>
+
+  <div class="services">
+    <a class="service-btn" href="Computer Development Fund.html">
+      <span class="service-icon">CDF</span>
+      <span>
+        <span class="service-label">Computer Development Fund</span>
+        <span class="service-sub">Fund records and management</span>
+      </span>
+    </a>
+
+    <a class="service-btn" href="Examination Staff Attendance Generater.html">
+      <span class="service-icon">EX</span>
+      <span>
+        <span class="service-label">Examination Staff Attendance Generator</span>
+        <span class="service-sub">Generate exam duty attendance</span>
+      </span>
+    </a>
+
+    <a class="service-btn" href="Attendance generator.html">
+      <span class="service-icon">AT</span>
+      <span>
+        <span class="service-label">Attendance Generator</span>
+        <span class="service-sub">Generate staff attendance sheets</span>
+      </span>
+    </a>
+
+    <a class="service-btn" href="File Uploader.html">
+      <span class="service-icon">FU</span>
+      <span>
+        <span class="service-label">File Uploader</span>
+        <span class="service-sub">Upload and manage files</span>
+      </span>
+    </a>
+	
+	<a class="service-btn" href="MAINTENANCE WORKS ORDERS REQUEST FORM.html">
+      <span class="service-icon">MR</span>
+      <span>
+        <span class="service-label">Maintenance Work Order</span>
+        <span class="service-sub">Request for work</span>
+      </span>
+    </a>
+  </div>
+
+  <p class="placeholder-note">
+    More services will be added here over time. To add one, copy a
+    <code>.service-btn</code> block above and point its <code>href</code>
+    to the new page's file name.
+  </p>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <span>&copy; <span id="year"></span> Computer Unit, University of Jaffna</span>
+    <span>
+      <a href="https://cu.jfn.ac.lk">cu.jfn.ac.lk</a>
+      &nbsp;&middot;&nbsp;
+      <a href="mailto:computer_centre@univ.jfn.ac.lk">computer_centre@univ.jfn.ac.lk</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+</script>
+
+</body>
+</html>
