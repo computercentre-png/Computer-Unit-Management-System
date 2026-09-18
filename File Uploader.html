@@ -1,46 +1,344 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google Drive Uploader</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 650px; margin: 40px auto; padding: 20px; background: #f9f9f9; color: #333; }
-        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); box-sizing: border-box; width: 100%; }
-        h2 { margin-top: 0; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: 600; }
-        
-        .folder-row { display: flex; gap: 8px; width: 100%; align-items: center; }
-        select { flex: 1; min-width: 0; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: Arial; }
-        
-        input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 600; }
-        button:hover { background: #1557b0; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        .btn-full { width: 100%; }
-        .btn-secondary { background: #5f6368; padding: 10px 14px; font-size: 14px; white-space: nowrap; flex-shrink: 0; }
-        .btn-secondary:hover { background: #3c4043; }
-        #progress-container { display: none; margin-top: 20px; }
-        #progress-bar { width: 100%; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
-        #progress-fill { height: 20px; background: #34a853; width: 0%; transition: width 0.2s; }
-        #status-message { margin-top: 10px; font-size: 14px; text-align: center; }
-        .error-log { color: #d93025; background: #fce8e6; padding: 10px; border-radius: 4px; font-size: 13px; margin-top: 15px; white-space: pre-wrap; word-break: break-word; }
-        .hidden { display: none; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Filing Desk &amp; Drive Uploader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ============ Shared page shell ============ */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #fff; }
+
+  .app-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    gap: 0;
+    background: #262320;
+    padding: 0 16px;
+  }
+  .app-nav button {
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    background: transparent;
+    color: #cfc9bd;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 16px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .app-nav button:hover { color: #fff; }
+  .app-nav button.active { color: #fff; border-bottom-color: #d9a06b; }
+
+  .app-section { display: none; }
+  .app-section.active { display: block; }
+
+  /* ============ Section 1: PDF Filing Desk ============ */
+  #pdf-desk-section {
+    --paper: #EFEAE0;
+    --card: #FBF9F3;
+    --ink: #262320;
+    --ink-soft: #6b6355;
+    --rule: #d8d0bd;
+    --tab: #7A4B2A;
+    --tab-soft: #a5754a;
+    --tab-bg: #f1e3d2;
+    --danger: #9b3b2e;
+    --focus: #1f5c57;
+
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    padding: 48px 20px 80px;
+  }
+  @media (prefers-color-scheme: dark) {
+    #pdf-desk-section:not([data-theme="light"]) {
+      --paper: #1c1a17;
+      --card: #26231f;
+      --ink: #ece6db;
+      --ink-soft: #a89e8c;
+      --rule: #3c372f;
+      --tab: #d9a06b;
+      --tab-soft: #b98253;
+      --tab-bg: #362a1f;
+      --danger: #e08674;
+      --focus: #6fbdb5;
+    }
+  }
+  #pdf-desk-section[data-theme="dark"] {
+    --paper: #1c1a17;
+    --card: #26231f;
+    --ink: #ece6db;
+    --ink-soft: #a89e8c;
+    --rule: #3c372f;
+    --tab: #d9a06b;
+    --tab-soft: #b98253;
+    --tab-bg: #362a1f;
+    --danger: #e08674;
+    --focus: #6fbdb5;
+  }
+
+  #pdf-desk-section .wrap { max-width: 820px; margin: 0 auto; }
+
+  #pdf-desk-section header { margin-bottom: 32px; }
+  #pdf-desk-section .eyebrow {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    color: var(--tab);
+    font-weight: 600;
+    margin: 0 0 6px;
+  }
+  #pdf-desk-section h1 {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-weight: 700;
+    font-size: 38px;
+    line-height: 1.15;
+    margin: 0 0 12px;
+  }
+  #pdf-desk-section header p {
+    color: var(--ink-soft);
+    font-size: 15.5px;
+    line-height: 1.6;
+    max-width: 56ch;
+    margin: 0;
+  }
+
+  #pdf-desk-section .dropzone {
+    border: 2px dashed var(--rule);
+    background: var(--card);
+    border-radius: 4px;
+    padding: 36px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+    margin-bottom: 28px;
+  }
+  #pdf-desk-section .dropzone.drag { border-color: var(--tab); background: var(--tab-bg); }
+  #pdf-desk-section .dropzone:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  #pdf-desk-section .dropzone .icon { font-size: 26px; display: block; margin-bottom: 10px; }
+  #pdf-desk-section .dropzone .main { font-size: 15px; font-weight: 500; }
+  #pdf-desk-section .dropzone .sub { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+  #pdf-desk-section input[type="file"] { display: none; }
+
+  #pdf-desk-section .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    min-height: 32px;
+  }
+  #pdf-desk-section .toolbar h2 {
+    font-family: 'Source Serif 4', serif;
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--ink);
+  }
+  #pdf-desk-section .toolbar .count { color: var(--ink-soft); font-weight: 400; }
+
+  #pdf-desk-section button {
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    padding: 9px 16px;
+  }
+  #pdf-desk-section button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  #pdf-desk-section button:disabled { cursor: not-allowed; opacity: .45; }
+
+  #pdf-desk-section .btn-primary { background: var(--tab); color: #fff; }
+  #pdf-desk-section .btn-primary:hover:not(:disabled) { background: var(--tab-soft); }
+  #pdf-desk-section .btn-ghost { background: transparent; color: var(--ink-soft); border-color: var(--rule); }
+  #pdf-desk-section .btn-ghost:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-soft); }
+  #pdf-desk-section .btn-small { padding: 6px 12px; font-size: 12.5px; }
+
+  #pdf-desk-section ul.files { list-style: none; margin: 0; padding: 0; }
+  #pdf-desk-section .file-card {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--tab);
+    border-radius: 3px;
+    padding: 16px 18px 18px;
+    margin-bottom: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  #pdf-desk-section .file-card.error { border-left-color: var(--danger); }
+  #pdf-desk-section .card-top {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  #pdf-desk-section .file-num {
+    font-family: 'Source Serif 4', serif;
+    font-size: 13px;
+    color: var(--ink-soft);
+    flex-shrink: 0;
+  }
+  #pdf-desk-section .thumb-wrap {
+    align-self: center;
+    width: 75%;
+    min-width: 260px;
+    max-width: 620px;
+    aspect-ratio: 0.77;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: #fff;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #pdf-desk-section .thumb-wrap img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  #pdf-desk-section .thumb-wrap .thumb-fallback { font-size: 40px; }
+  #pdf-desk-section .file-body { flex: 1; min-width: 0; }
+  #pdf-desk-section .original-name {
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-bottom: 6px;
+    word-break: break-all;
+  }
+  #pdf-desk-section .name-row { display: flex; gap: 8px; align-items: center; }
+  #pdf-desk-section .name-input {
+    flex: 1;
+    font-family: 'Source Serif 4', serif;
+    font-size: 15.5px;
+    padding: 9px 10px;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--paper);
+    color: var(--ink);
+    min-width: 0;
+  }
+  #pdf-desk-section .name-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  #pdf-desk-section .status-line {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+  }
+  #pdf-desk-section .status-line.error { color: var(--danger); }
+  #pdf-desk-section .saved-tag { color: var(--focus); font-weight: 600; }
+
+  #pdf-desk-section .spinner {
+    display: inline-block;
+    width: 11px; height: 11px;
+    border: 2px solid var(--rule);
+    border-top-color: var(--tab);
+    border-radius: 50%;
+    animation: pdf-desk-spin .7s linear infinite;
+    vertical-align: -1px;
+    margin-right: 5px;
+  }
+  @keyframes pdf-desk-spin { to { transform: rotate(360deg); } }
+
+  #pdf-desk-section .empty {
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 14px;
+    padding: 30px 10px;
+  }
+
+  #pdf-desk-section footer.note {
+    margin-top: 28px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+
+  /* ============ Section 2: Drive Uploader ============ */
+  #uploader-section {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    max-width: 650px;
+    margin: 40px auto;
+    padding: 20px;
+    background: #f9f9f9;
+    color: #333;
+    min-height: calc(100vh - 90px);
+  }
+  #uploader-section .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); box-sizing: border-box; width: 100%; }
+  #uploader-section h2 { margin-top: 0; }
+  #uploader-section .form-group { margin-bottom: 20px; }
+  #uploader-section label { display: block; margin-bottom: 8px; font-weight: 600; }
+
+  #uploader-section .folder-row { display: flex; gap: 8px; width: 100%; align-items: center; }
+  #uploader-section select { flex: 1; min-width: 0; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: Arial; }
+
+  #uploader-section input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+  #uploader-section button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: 600; }
+  #uploader-section button:hover { background: #1557b0; }
+  #uploader-section button:disabled { background: #ccc; cursor: not-allowed; }
+  #uploader-section .btn-full { width: 100%; }
+  #uploader-section .btn-secondary { background: #5f6368; padding: 10px 14px; font-size: 14px; white-space: nowrap; flex-shrink: 0; }
+  #uploader-section .btn-secondary:hover { background: #3c4043; }
+  #uploader-section #progress-container { display: none; margin-top: 20px; }
+  #uploader-section #progress-bar { width: 100%; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+  #uploader-section #progress-fill { height: 20px; background: #34a853; width: 0%; transition: width 0.2s; }
+  #uploader-section #status-message { margin-top: 10px; font-size: 14px; text-align: center; }
+  #uploader-section .error-log { color: #d93025; background: #fce8e6; padding: 10px; border-radius: 4px; font-size: 13px; margin-top: 15px; white-space: pre-wrap; word-break: break-word; }
+  #uploader-section .hidden { display: none; }
+</style>
 </head>
 <body>
 
+<nav class="app-nav">
+  <button type="button" class="nav-btn active" data-target="pdf-desk-section">1. The Filing Desk</button>
+  <button type="button" class="nav-btn" data-target="uploader-section">2. Drive Uploader</button>
+</nav>
+
+<!-- ============ Section 1: PDF Filing Desk ============ -->
+<section id="pdf-desk-section" class="app-section active">
+<div class="wrap">
+  <header>
+    <p class="eyebrow">PDF filing</p>
+    <h1>The Filing Desk</h1>
+    <p>Drop in PDFs with cryptic export names — scan_003.pdf, download (4).pdf — and this reads each one's opening page to suggest a real name from its content. Edit anything before you save.</p>
+  </header>
+
+  <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload PDF files">
+    <span class="icon">🗂️</span>
+    <div class="main">Drop PDFs here, or click to choose files</div>
+    <div class="sub">Nothing leaves your browser — files are read locally.</div>
+    <input type="file" id="fileInput" accept="application/pdf,.pdf" multiple>
+  </div>
+
+  <div class="toolbar" id="toolbar" style="display:none;">
+    <h2>Files <span class="count" id="fileCount"></span></h2>
+    <div style="display:flex; gap:8px;">
+      <button class="btn-ghost btn-small" id="clearBtn" type="button">Clear all</button>
+      <button class="btn-primary btn-small" id="saveAllBtn" type="button" disabled>Save all as .zip</button>
+    </div>
+  </div>
+
+  <ul class="files" id="fileList"></ul>
+  <div class="empty" id="emptyState">No files yet. This list will fill in once you add some.</div>
+
+  <footer class="note">Names are guessed from the largest text on each PDF's first page — usually a title or heading. Scanned pages have no text to read, so you'll see a preview of the page instead — a quick glance tells you what to type. Nothing is uploaded anywhere; renaming happens by saving a new copy with the suggested name.</footer>
+</div>
+</section>
+
+<!-- ============ Section 2: Drive Uploader ============ -->
+<section id="uploader-section" class="app-section">
     <div class="card">
         <h2>Document Uploader</h2>
         <p>Authenticate to upload directly into the shared organizational drive.</p>
-        
+
         <button id="auth-btn" class="btn-full" onclick="handleAuthClick()">Authorize Google Drive</button>
         <button id="signout-btn" class="btn-full hidden" onclick="handleSignoutClick()">Sign Out</button>
 
         <div id="upload-section" class="hidden">
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-            
+
             <div class="form-group">
                 <label for="folder-select">Target Folder Structure</label>
                 <div class="folder-row">
@@ -65,288 +363,633 @@
         </div>
         <div id="error-box" class="error-log hidden"></div>
     </div>
+</section>
 
-    <!-- Google API & Identity Services -->
-    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+<!-- ============ Simple section switcher (new; does not touch either tool's own functions) ============ -->
+<script>
+  (function () {
+    var navButtons = document.querySelectorAll('.app-nav .nav-btn');
+    navButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        navButtons.forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        document.querySelectorAll('.app-section').forEach(function (sec) {
+          sec.classList.toggle('active', sec.id === btn.dataset.target);
+        });
+      });
+    });
+  })();
+</script>
 
-    <script>
-        const CLIENT_ID = '820281012007-6512ohceo24ntafa40827fdlk5guouha.apps.googleusercontent.com';
-        const API_KEY = 'AIzaSyDRQuS69ufRIUpNGgRnktPqCgaIz2E5p90';
-        const ROOT_FOLDER_ID = '1sqkpSHRjoi6354uke9zfYKpc1PIKjTlC';
-        const SCOPES = 'https://www.googleapis.com/auth/drive';
+<!-- ============ Section 1 libraries & logic (unchanged) ============ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function () {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-        let tokenClient;
-        let accessToken = null;
-        let gapiInited = false;
-        let gisInited = false;
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileList = document.getElementById('fileList');
+  const emptyState = document.getElementById('emptyState');
+  const toolbar = document.getElementById('toolbar');
+  const fileCount = document.getElementById('fileCount');
+  const saveAllBtn = document.getElementById('saveAllBtn');
+  const clearBtn = document.getElementById('clearBtn');
 
-        function showError(msg) {
-            const errBox = document.getElementById('error-box');
-            errBox.textContent = msg;
-            errBox.classList.remove('hidden');
+  let entries = [];
+  let seq = 0;
+  let downloadsApi = null;
+
+  (async () => {
+    try {
+      if (window.claude && window.claude.use) {
+        downloadsApi = await window.claude.use('downloads');
+      }
+    } catch (e) { downloadsApi = null; }
+  })();
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  });
+  ['dragenter', 'dragover'].forEach(evt =>
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('drag'); })
+  );
+  ['dragleave', 'drop'].forEach(evt =>
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('drag'); })
+  );
+  dropzone.addEventListener('drop', (e) => {
+    handleFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', (e) => {
+    handleFiles(e.target.files);
+    fileInput.value = '';
+  });
+
+  clearBtn.addEventListener('click', () => {
+    entries = [];
+    render();
+  });
+
+  saveAllBtn.addEventListener('click', async () => {
+    const ready = entries.filter(e => e.status === 'ready' || e.status === 'saved');
+    if (!ready.length) return;
+    saveAllBtn.disabled = true;
+    const prevLabel = saveAllBtn.textContent;
+    saveAllBtn.textContent = 'Zipping…';
+    try {
+      const zip = new JSZip();
+      const usedZipNames = new Set();
+      for (const entry of ready) {
+        let name = ensurePdfExt(entry.currentName() || entry.originalName);
+        let base = name, i = 2;
+        while (usedZipNames.has(name)) { name = withSuffix(base, i++); }
+        usedZipNames.add(name);
+        zip.file(name, new Blob([entry.buffer], { type: 'application/pdf' }));
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const result = await saveFile('renamed-pdfs.zip', blob);
+      if (result === 'saved' || result === 'delivered') {
+        ready.forEach(entry => { entry.status = 'saved'; });
+        render();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      saveAllBtn.disabled = ready.length === 0;
+      saveAllBtn.textContent = prevLabel;
+    }
+  });
+
+  function handleFiles(fileListObj) {
+    const files = Array.from(fileListObj || []).filter(f =>
+      f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+    );
+    files.forEach(addFile);
+  }
+
+  function addFile(file) {
+    const entry = {
+      id: 'f' + (++seq),
+      file,
+      originalName: file.name,
+      buffer: null,
+      suggested: null,
+      thumbnail: null,
+      status: 'reading', // reading | ready | error | saved
+      errorMsg: '',
+      editedName: null,
+      currentName() { return this.editedName !== null ? this.editedName : this.suggested; }
+    };
+    entries.push(entry);
+    render();
+    processEntry(entry);
+  }
+
+  async function processEntry(entry) {
+    try {
+      entry.buffer = await entry.file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: entry.buffer.slice(0) }).promise;
+      const page = await pdf.getPage(1);
+
+      try {
+        entry.thumbnail = await renderThumbnail(page);
+        render();
+      } catch (e) {
+        console.error('thumbnail failed', e);
+      }
+
+      const title = await extractTitleFromPage(page);
+      let base = sanitizeFilename(title) || sanitizeFilename(stripExt(entry.originalName));
+      if (!base) base = 'untitled-document';
+      let name = base;
+      const used = entries.filter(e => e !== entry && (e.status === 'ready' || e.status === 'saved')).map(e => e.currentName());
+      let i = 2;
+      while (used.includes(name)) { name = withSuffix(base, i++); }
+      entry.suggested = name;
+      entry.status = title ? 'ready' : 'error';
+      entry.errorMsg = title ? '' : 'This looks like a scanned page — no text to read. Check the preview and type a name.';
+    } catch (e) {
+      console.error(e);
+      entry.status = 'error';
+      entry.errorMsg = 'Could not read this PDF. Original name kept.';
+      entry.suggested = sanitizeFilename(stripExt(entry.originalName)) || 'untitled-document';
+    }
+    render();
+  }
+
+  async function renderThumbnail(page) {
+    const baseViewport = page.getViewport({ scale: 1 });
+    const targetWidth = 1100;
+    const scale = targetWidth / baseViewport.width;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    return canvas.toDataURL('image/png');
+  }
+
+  async function extractTitleFromPage(page) {
+    const content = await page.getTextContent();
+    const items = content.items
+      .filter(it => it.str && it.str.trim().length > 0)
+      .map(it => ({
+        str: it.str,
+        size: Math.hypot(it.transform[2], it.transform[3]) || Math.abs(it.transform[0]) || 0,
+        y: it.transform[5],
+        x: it.transform[4]
+      }));
+    if (!items.length) return null;
+
+    const maxSize = Math.max(...items.map(i => i.size));
+    const threshold = maxSize * 0.85;
+    let candidates = items.filter(i => i.size >= threshold);
+    candidates.sort((a, b) => b.y - a.y || a.x - b.x);
+    let title = '';
+    if (candidates.length) {
+      const topY = candidates[0].y;
+      const line = candidates.filter(c => Math.abs(c.y - topY) < 6).sort((a, b) => a.x - b.x);
+      title = line.map(c => c.str).join(' ').replace(/\s+/g, ' ').trim();
+    }
+    if (!title || title.length < 3) {
+      title = items.slice(0, 10).map(i => i.str).join(' ').replace(/\s+/g, ' ').trim();
+    }
+    return title || null;
+  }
+
+  function sanitizeFilename(str) {
+    if (!str) return '';
+    let s = String(str).normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+    s = s.replace(/[\/\\:*?"<>|]/g, ' ');
+    s = s.replace(/\s+/g, ' ').trim();
+    if (s.length > 80) s = s.slice(0, 80).trim();
+    return s;
+  }
+  function stripExt(name) { return name.replace(/\.pdf$/i, ''); }
+  function ensurePdfExt(name) { return /\.pdf$/i.test(name) ? name : name + '.pdf'; }
+  function withSuffix(base, n) { return `${base} (${n})`; }
+
+  async function saveFile(filename, blob) {
+    if (downloadsApi) {
+      try {
+        const res = await downloadsApi.save({ filename, data: blob });
+        return res.status;
+      } catch (e) {
+        if (e && e.code === 'declined') return 'declined';
+        // fall through to anchor fallback for other error codes
+      }
+    }
+    try {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      return 'saved';
+    } catch (e) {
+      console.error(e);
+      return 'error';
+    }
+  }
+
+  function render() {
+    fileList.innerHTML = '';
+    emptyState.style.display = entries.length ? 'none' : 'block';
+    toolbar.style.display = entries.length ? 'flex' : 'none';
+    fileCount.textContent = entries.length ? `— ${entries.length}` : '';
+    const anyReady = entries.some(e => e.status === 'ready' || e.status === 'saved');
+    saveAllBtn.disabled = !anyReady;
+
+    entries.forEach((entry, idx) => {
+      const li = document.createElement('li');
+      li.className = 'file-card' + (entry.status === 'error' ? ' error' : '');
+
+      const num = document.createElement('div');
+      num.className = 'file-num';
+      num.textContent = String(idx + 1).padStart(2, '0');
+
+      const cardTop = document.createElement('div');
+      cardTop.className = 'card-top';
+      cardTop.appendChild(num);
+
+      const orig = document.createElement('div');
+      orig.className = 'original-name';
+      orig.style.marginBottom = '0';
+      orig.textContent = entry.originalName;
+      cardTop.appendChild(orig);
+      li.appendChild(cardTop);
+
+      const thumbWrap = document.createElement('div');
+      thumbWrap.className = 'thumb-wrap';
+      if (entry.thumbnail) {
+        const img = document.createElement('img');
+        img.src = entry.thumbnail;
+        img.alt = 'First page preview of ' + entry.originalName;
+        thumbWrap.appendChild(img);
+      } else {
+        const fallback = document.createElement('span');
+        fallback.className = 'thumb-fallback';
+        fallback.textContent = '📄';
+        thumbWrap.appendChild(fallback);
+      }
+      li.appendChild(thumbWrap);
+
+      const body = document.createElement('div');
+      body.className = 'file-body';
+
+      const row = document.createElement('div');
+      row.className = 'name-row';
+
+      if (entry.status === 'reading') {
+        const status = document.createElement('div');
+        status.className = 'status-line';
+        status.innerHTML = '<span class="spinner"></span>Reading first page…';
+        body.appendChild(row);
+        body.appendChild(status);
+      } else {
+        const input = document.createElement('input');
+        input.className = 'name-input';
+        input.type = 'text';
+        input.value = entry.currentName() || '';
+        input.setAttribute('aria-label', 'Suggested file name for ' + entry.originalName);
+        input.addEventListener('input', () => {
+          entry.editedName = input.value;
+          if (entry.status === 'saved') entry.status = 'ready';
+        });
+
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'btn-primary btn-small';
+        saveBtn.type = 'button';
+        saveBtn.textContent = entry.status === 'saved' ? 'Saved' : 'Save';
+        saveBtn.disabled = entry.status === 'saved';
+        saveBtn.addEventListener('click', async () => {
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving…';
+          const name = ensurePdfExt(entry.currentName() || entry.originalName);
+          const blob = new Blob([entry.buffer], { type: 'application/pdf' });
+          const result = await saveFile(name, blob);
+          if (result === 'saved' || result === 'delivered') {
+            entry.status = 'saved';
+          } else {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save';
+          }
+          render();
+        });
+
+        row.appendChild(input);
+        row.appendChild(saveBtn);
+        body.appendChild(row);
+
+        if (entry.errorMsg) {
+          const status = document.createElement('div');
+          status.className = 'status-line error';
+          status.textContent = entry.errorMsg;
+          body.appendChild(status);
+        } else if (entry.status === 'saved') {
+          const status = document.createElement('div');
+          status.className = 'status-line saved-tag';
+          status.textContent = 'Saved.';
+          body.appendChild(status);
         }
+      }
 
-        function clearError() {
-            const errBox = document.getElementById('error-box');
-            errBox.textContent = '';
-            errBox.classList.add('hidden');
+      li.appendChild(body);
+      fileList.appendChild(li);
+    });
+  }
+
+  render();
+})();
+</script>
+
+<!-- ============ Section 2 libraries & logic (unchanged) ============ -->
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+
+<script>
+    const CLIENT_ID = '820281012007-6512ohceo24ntafa40827fdlk5guouha.apps.googleusercontent.com';
+    const API_KEY = 'AIzaSyDRQuS69ufRIUpNGgRnktPqCgaIz2E5p90';
+    const ROOT_FOLDER_ID = '1sqkpSHRjoi6354uke9zfYKpc1PIKjTlC';
+    const SCOPES = 'https://www.googleapis.com/auth/drive';
+
+    let tokenClient;
+    let accessToken = null;
+    let gapiInited = false;
+    let gisInited = false;
+
+    function showError(msg) {
+        const errBox = document.getElementById('error-box');
+        errBox.textContent = msg;
+        errBox.classList.remove('hidden');
+    }
+
+    function clearError() {
+        const errBox = document.getElementById('error-box');
+        errBox.textContent = '';
+        errBox.classList.add('hidden');
+    }
+
+    function gapiLoaded() {
+        gapi.load('client', () => {
+            gapi.client.init({ apiKey: API_KEY }).then(() => {
+                gapiInited = true;
+                maybeEnableButtons();
+            }).catch(err => showError('GAPI Init Error: ' + JSON.stringify(err)));
+        });
+    }
+
+    function gisLoaded() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: (resp) => {
+                if (resp.error !== undefined) {
+                    showError('Auth Error: ' + resp.error);
+                    throw resp;
+                }
+                accessToken = resp.access_token;
+
+                // Save token and expiration timestamp (expires_in is in seconds)
+                const expiresInMs = (resp.expires_in || 3600) * 1000;
+                const expiryTime = Date.now() + expiresInMs;
+                localStorage.setItem('gdrive_token', accessToken);
+                localStorage.setItem('gdrive_token_expiry', expiryTime);
+
+                applyTokenAndLoad();
+            },
+        });
+        gisInited = true;
+        maybeEnableButtons();
+    }
+
+    function maybeEnableButtons() {
+        if (gapiInited && gisInited) {
+            document.getElementById('auth-btn').disabled = false;
+            checkSavedSession();
         }
+    }
 
-        function gapiLoaded() {
-            gapi.load('client', () => {
-                gapi.client.init({ apiKey: API_KEY }).then(() => {
-                    gapiInited = true;
-                    maybeEnableButtons();
-                }).catch(err => showError('GAPI Init Error: ' + JSON.stringify(err)));
+    // Restore active token from localStorage on page visit/refresh
+    function checkSavedSession() {
+        const savedToken = localStorage.getItem('gdrive_token');
+        const savedExpiry = localStorage.getItem('gdrive_token_expiry');
+
+        if (savedToken && savedExpiry) {
+            // Check if token is still valid (with 1-minute buffer)
+            if (Date.now() < (parseInt(savedExpiry) - 60000)) {
+                accessToken = savedToken;
+                applyTokenAndLoad();
+            } else {
+                // Token expired; clear storage
+                localStorage.removeItem('gdrive_token');
+                localStorage.removeItem('gdrive_token_expiry');
+            }
+        }
+    }
+
+    function applyTokenAndLoad() {
+        gapi.client.setToken({ access_token: accessToken });
+        document.getElementById('auth-btn').classList.add('hidden');
+        document.getElementById('signout-btn').classList.remove('hidden');
+        document.getElementById('upload-section').classList.remove('hidden');
+        loadFolderTreeFast();
+    }
+
+    function handleAuthClick() {
+        clearError();
+        tokenClient.requestAccessToken({ prompt: '' }); // Uses cached session seamlessly
+    }
+
+    function handleSignoutClick() {
+        localStorage.removeItem('gdrive_token');
+        localStorage.removeItem('gdrive_token_expiry');
+
+        if (accessToken) {
+            google.accounts.oauth2.revoke(accessToken, () => {
+                accessToken = null;
+                gapi.client.setToken(null);
+                document.getElementById('auth-btn').classList.remove('hidden');
+                document.getElementById('signout-btn').classList.add('hidden');
+                document.getElementById('upload-section').classList.add('hidden');
             });
         }
+    }
 
-        function gisLoaded() {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: (resp) => {
-                    if (resp.error !== undefined) {
-                        showError('Auth Error: ' + resp.error);
-                        throw resp;
+    async function loadFolderTreeFast() {
+        const select = document.getElementById('folder-select');
+        select.innerHTML = '<option value="">Syncing latest folders...</option>';
+        clearError();
+
+        try {
+            let allFolders = [];
+            let pageToken = null;
+
+            do {
+                const response = await gapi.client.request({
+                    path: 'https://www.googleapis.com/drive/v3/files',
+                    method: 'GET',
+                    params: {
+                        q: "mimeType='application/vnd.google-apps.folder' and trashed=false",
+                        fields: 'nextPageToken, files(id, name, parents)',
+                        pageSize: 1000,
+                        pageToken: pageToken,
+                        supportsAllDrives: true,
+                        includeItemsFromAllDrives: true
                     }
-                    accessToken = resp.access_token;
-                    
-                    // Save token and expiration timestamp (expires_in is in seconds)
-                    const expiresInMs = (resp.expires_in || 3600) * 1000;
-                    const expiryTime = Date.now() + expiresInMs;
-                    localStorage.setItem('gdrive_token', accessToken);
-                    localStorage.setItem('gdrive_token_expiry', expiryTime);
+                });
 
-                    applyTokenAndLoad();
+                if (response.result && response.result.files) {
+                    allFolders = allFolders.concat(response.result.files);
+                }
+                pageToken = response.result.nextPageToken;
+            } while (pageToken);
+
+            const childrenMap = {};
+            allFolders.forEach(folder => {
+                if (folder.parents) {
+                    folder.parents.forEach(pId => {
+                        if (!childrenMap[pId]) childrenMap[pId] = [];
+                        childrenMap[pId].push(folder);
+                    });
+                }
+            });
+
+            const orderedFolders = [];
+            function traverse(parentId, level) {
+                let children = childrenMap[parentId] || [];
+                children.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+                for (let child of children) {
+                    orderedFolders.push({ id: child.id, name: child.name, level: level });
+                    traverse(child.id, level + 1);
+                }
+            }
+
+            traverse(ROOT_FOLDER_ID, 0);
+
+            const displayFolders = orderedFolders.length > 0 ? orderedFolders : allFolders.map(f => ({ id: f.id, name: f.name, level: 0 }));
+            if (orderedFolders.length === 0) {
+                displayFolders.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+            }
+
+            select.innerHTML = '<option value="">-- Select Target Folder --</option>';
+
+            if (displayFolders.length > 0) {
+                displayFolders.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder.id;
+                    const indent = "\u00A0\u00A0\u00A0\u00A0".repeat(folder.level);
+                    const prefix = folder.level > 0 ? "└─ " : "";
+                    option.textContent = indent + prefix + folder.name;
+                    select.appendChild(option);
+                });
+            } else {
+                select.innerHTML = '<option value="">No folders found</option>';
+            }
+
+        } catch (err) {
+            console.error(err);
+            const errMsg = err.result?.error?.message || err.message || JSON.stringify(err);
+
+            // If token expired on server side, clear and prompt login
+            if (err.status === 401) {
+                localStorage.removeItem('gdrive_token');
+                localStorage.removeItem('gdrive_token_expiry');
+                document.getElementById('auth-btn').classList.remove('hidden');
+                document.getElementById('upload-section').classList.add('hidden');
+            }
+
+            showError('Drive API Error: ' + errMsg);
+            select.innerHTML = '<option value="">Error loading structure</option>';
+        }
+    }
+
+    async function startUpload() {
+        const fileInput = document.getElementById('file-input');
+        const folderSelect = document.getElementById('folder-select');
+        const file = fileInput.files[0];
+        const folderId = folderSelect.value;
+
+        if (!file) return alert("Please select a file.");
+        if (!folderId) return alert("Please select a target folder.");
+
+        const uiContainer = document.getElementById('progress-container');
+        const uiFill = document.getElementById('progress-fill');
+        const uiMsg = document.getElementById('status-message');
+        const uploadBtn = document.getElementById('upload-btn');
+
+        uiContainer.style.display = 'block';
+        uiFill.style.width = '0%';
+        uiMsg.style.color = '#333';
+        uiMsg.textContent = 'Initiating upload...';
+        uploadBtn.disabled = true;
+
+        const metadata = {
+            name: file.name,
+            parents: [folderId]
+        };
+
+        try {
+            const initRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'X-Upload-Content-Type': file.type,
+                    'X-Upload-Content-Length': file.size
                 },
+                body: JSON.stringify(metadata)
             });
-            gisInited = true;
-            maybeEnableButtons();
-        }
 
-        function maybeEnableButtons() {
-            if (gapiInited && gisInited) {
-                document.getElementById('auth-btn').disabled = false;
-                checkSavedSession();
-            }
-        }
+            if (!initRes.ok) throw new Error('Failed to initialize upload session.');
+            const locationUrl = initRes.headers.get('Location');
 
-        // Restore active token from localStorage on page visit/refresh
-        function checkSavedSession() {
-            const savedToken = localStorage.getItem('gdrive_token');
-            const savedExpiry = localStorage.getItem('gdrive_token_expiry');
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', locationUrl, true);
+            xhr.setRequestHeader('Content-Type', file.type);
 
-            if (savedToken && savedExpiry) {
-                // Check if token is still valid (with 1-minute buffer)
-                if (Date.now() < (parseInt(savedExpiry) - 60000)) {
-                    accessToken = savedToken;
-                    applyTokenAndLoad();
-                } else {
-                    // Token expired; clear storage
-                    localStorage.removeItem('gdrive_token');
-                    localStorage.removeItem('gdrive_token_expiry');
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percentComplete = Math.round((event.loaded / event.total) * 100);
+                    uiFill.style.width = percentComplete + '%';
+                    uiMsg.textContent = `Uploading: ${percentComplete}%`;
                 }
-            }
-        }
-
-        function applyTokenAndLoad() {
-            gapi.client.setToken({ access_token: accessToken });
-            document.getElementById('auth-btn').classList.add('hidden');
-            document.getElementById('signout-btn').classList.remove('hidden');
-            document.getElementById('upload-section').classList.remove('hidden');
-            loadFolderTreeFast();
-        }
-
-        function handleAuthClick() {
-            clearError();
-            tokenClient.requestAccessToken({ prompt: '' }); // Uses cached session seamlessly
-        }
-
-        function handleSignoutClick() {
-            localStorage.removeItem('gdrive_token');
-            localStorage.removeItem('gdrive_token_expiry');
-            
-            if (accessToken) {
-                google.accounts.oauth2.revoke(accessToken, () => {
-                    accessToken = null;
-                    gapi.client.setToken(null);
-                    document.getElementById('auth-btn').classList.remove('hidden');
-                    document.getElementById('signout-btn').classList.add('hidden');
-                    document.getElementById('upload-section').classList.add('hidden');
-                });
-            }
-        }
-
-        async function loadFolderTreeFast() {
-            const select = document.getElementById('folder-select');
-            select.innerHTML = '<option value="">Syncing latest folders...</option>';
-            clearError();
-
-            try {
-                let allFolders = [];
-                let pageToken = null;
-
-                do {
-                    const response = await gapi.client.request({
-                        path: 'https://www.googleapis.com/drive/v3/files',
-                        method: 'GET',
-                        params: {
-                            q: "mimeType='application/vnd.google-apps.folder' and trashed=false",
-                            fields: 'nextPageToken, files(id, name, parents)',
-                            pageSize: 1000,
-                            pageToken: pageToken,
-                            supportsAllDrives: true,
-                            includeItemsFromAllDrives: true
-                        }
-                    });
-
-                    if (response.result && response.result.files) {
-                        allFolders = allFolders.concat(response.result.files);
-                    }
-                    pageToken = response.result.nextPageToken;
-                } while (pageToken);
-
-                const childrenMap = {};
-                allFolders.forEach(folder => {
-                    if (folder.parents) {
-                        folder.parents.forEach(pId => {
-                            if (!childrenMap[pId]) childrenMap[pId] = [];
-                            childrenMap[pId].push(folder);
-                        });
-                    }
-                });
-
-                const orderedFolders = [];
-                function traverse(parentId, level) {
-                    let children = childrenMap[parentId] || [];
-                    children.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-
-                    for (let child of children) {
-                        orderedFolders.push({ id: child.id, name: child.name, level: level });
-                        traverse(child.id, level + 1);
-                    }
-                }
-
-                traverse(ROOT_FOLDER_ID, 0);
-
-                const displayFolders = orderedFolders.length > 0 ? orderedFolders : allFolders.map(f => ({ id: f.id, name: f.name, level: 0 }));
-                if (orderedFolders.length === 0) {
-                    displayFolders.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-                }
-
-                select.innerHTML = '<option value="">-- Select Target Folder --</option>';
-
-                if (displayFolders.length > 0) {
-                    displayFolders.forEach(folder => {
-                        const option = document.createElement('option');
-                        option.value = folder.id;
-                        const indent = "\u00A0\u00A0\u00A0\u00A0".repeat(folder.level);
-                        const prefix = folder.level > 0 ? "└─ " : "";
-                        option.textContent = indent + prefix + folder.name;
-                        select.appendChild(option);
-                    });
-                } else {
-                    select.innerHTML = '<option value="">No folders found</option>';
-                }
-
-            } catch (err) {
-                console.error(err);
-                const errMsg = err.result?.error?.message || err.message || JSON.stringify(err);
-                
-                // If token expired on server side, clear and prompt login
-                if (err.status === 401) {
-                    localStorage.removeItem('gdrive_token');
-                    localStorage.removeItem('gdrive_token_expiry');
-                    document.getElementById('auth-btn').classList.remove('hidden');
-                    document.getElementById('upload-section').classList.add('hidden');
-                }
-                
-                showError('Drive API Error: ' + errMsg);
-                select.innerHTML = '<option value="">Error loading structure</option>';
-            }
-        }
-
-        async function startUpload() {
-            const fileInput = document.getElementById('file-input');
-            const folderSelect = document.getElementById('folder-select');
-            const file = fileInput.files[0];
-            const folderId = folderSelect.value;
-
-            if (!file) return alert("Please select a file.");
-            if (!folderId) return alert("Please select a target folder.");
-
-            const uiContainer = document.getElementById('progress-container');
-            const uiFill = document.getElementById('progress-fill');
-            const uiMsg = document.getElementById('status-message');
-            const uploadBtn = document.getElementById('upload-btn');
-            
-            uiContainer.style.display = 'block';
-            uiFill.style.width = '0%';
-            uiMsg.style.color = '#333';
-            uiMsg.textContent = 'Initiating upload...';
-            uploadBtn.disabled = true;
-
-            const metadata = {
-                name: file.name,
-                parents: [folderId]
             };
 
-            try {
-                const initRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                        'X-Upload-Content-Type': file.type,
-                        'X-Upload-Content-Length': file.size
-                    },
-                    body: JSON.stringify(metadata)
-                });
-
-                if (!initRes.ok) throw new Error('Failed to initialize upload session.');
-                const locationUrl = initRes.headers.get('Location');
-
-                const xhr = new XMLHttpRequest();
-                xhr.open('PUT', locationUrl, true);
-                xhr.setRequestHeader('Content-Type', file.type);
-                
-                xhr.upload.onprogress = (event) => {
-                    if (event.lengthComputable) {
-                        const percentComplete = Math.round((event.loaded / event.total) * 100);
-                        uiFill.style.width = percentComplete + '%';
-                        uiMsg.textContent = `Uploading: ${percentComplete}%`;
-                    }
-                };
-
-                xhr.onload = () => {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        uiFill.style.width = '100%';
-                        uiMsg.textContent = `Success! "${file.name}" uploaded.`;
-                        uiMsg.style.color = '#34a853';
-                        fileInput.value = '';
-                    } else {
-                        uiMsg.textContent = `Upload failed: ${xhr.statusText}`;
-                        uiMsg.style.color = 'red';
-                    }
-                    uploadBtn.disabled = false;
-                };
-
-                xhr.onerror = () => {
-                    uiMsg.textContent = 'An error occurred during upload.';
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    uiFill.style.width = '100%';
+                    uiMsg.textContent = `Success! "${file.name}" uploaded.`;
+                    uiMsg.style.color = '#34a853';
+                    fileInput.value = '';
+                } else {
+                    uiMsg.textContent = `Upload failed: ${xhr.statusText}`;
                     uiMsg.style.color = 'red';
-                    uploadBtn.disabled = false;
-                };
+                }
+                uploadBtn.disabled = false;
+            };
 
-                xhr.send(file);
-            } catch (error) {
-                console.error(error);
-                uiMsg.textContent = 'Upload failed. See console for details.';
+            xhr.onerror = () => {
+                uiMsg.textContent = 'An error occurred during upload.';
                 uiMsg.style.color = 'red';
                 uploadBtn.disabled = false;
-            }
+            };
+
+            xhr.send(file);
+        } catch (error) {
+            console.error(error);
+            uiMsg.textContent = 'Upload failed. See console for details.';
+            uiMsg.style.color = 'red';
+            uploadBtn.disabled = false;
         }
-    </script>
+    }
+</script>
 </body>
 </html>
