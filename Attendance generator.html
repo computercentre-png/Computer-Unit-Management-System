@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
   <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
@@ -669,7 +670,8 @@
         for (let i = 1; i <= totalPages; i++) {
           const page = await pdfJsDoc.getPage(i);
           const textContent = await page.getTextContent();
-          const pageString = textContent.items.map(item => item.str).join(' ');
+          let pageString = textContent.items.map(item => item.str).join(' ');
+          if (pageLooksEmpty(pageString)) pageString = await ocrPdfPage(page);
           
           pageTexts.push({ pageNum: i, cleanText: normalizeText(pageString) });
           updateProgress(Math.round(10 + (i / totalPages) * 40), `Extracting page text (${i}/${totalPages})...`);
@@ -747,6 +749,87 @@
         processBtn.classList.remove('opacity-50', 'cursor-not-allowed');
       }
     }
+
+    // ---------- OCR FALLBACK ----------
+    // Some pages (e.g. exports printed to PDF with text converted to outlines) have NO text layer,
+    // so pdf.js reads nothing from them. For those pages only, we render the page and OCR it.
+    let __ocrWorkerPromise = null;
+    function ocrToast(msg) {
+      let el = document.getElementById('ocrToast');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'ocrToast';
+        el.style.cssText = 'position:fixed;bottom:12px;right:12px;background:#0f766e;color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;z-index:99999;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+        document.body.appendChild(el);
+      }
+      el.textContent = msg;
+      el.style.display = msg ? 'block' : 'none';
+    }
+    function eraseGridLines(canvas) {
+      // Table borders confuse OCR. Erase long horizontal / vertical dark runs, keep text.
+      const w = canvas.width, h = canvas.height, ctx = canvas.getContext('2d');
+      const img = ctx.getImageData(0, 0, w, h), d = img.data;
+      const dark = new Uint8Array(w * h);
+      for (let i = 0, j = 0; i < d.length; i += 4, j++) dark[j] = (Math.min(d[i], d[i + 1], d[i + 2]) < 170) ? 1 : 0;
+      const kill = new Uint8Array(w * h);
+      const HMIN = Math.round(w * 0.025), VMIN = Math.round(h * 0.014);
+      for (let y = 0; y < h; y++) {
+        let run = 0;
+        for (let x = 0; x <= w; x++) {
+          if (x < w && dark[y * w + x]) run++;
+          else { if (run >= HMIN) for (let k = x - run; k < x; k++) kill[y * w + k] = 1; run = 0; }
+        }
+      }
+      for (let x = 0; x < w; x++) {
+        let run = 0;
+        for (let y = 0; y <= h; y++) {
+          if (y < h && dark[y * w + x]) run++;
+          else { if (run >= VMIN) for (let k = y - run; k < y; k++) kill[k * w + x] = 1; run = 0; }
+        }
+      }
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        let hit = kill[y * w + x];
+        if (!hit && dark[y * w + x]) {   // thicken: remove dark pixels directly touching a killed pixel
+          if ((x > 0 && kill[y * w + x - 1]) || (x < w - 1 && kill[y * w + x + 1]) || (y > 0 && kill[(y - 1) * w + x]) || (y < h - 1 && kill[(y + 1) * w + x])) hit = 1;
+        }
+        // output: pure black ink on pure white (colour text becomes black, shaded rows become white)
+        const i = (y * w + x) * 4, v = (!hit && dark[y * w + x]) ? 0 : 255;
+        d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+    }
+    async function ocrPdfPage(page) {
+      if (typeof Tesseract === 'undefined') { console.warn('Tesseract.js not loaded - cannot OCR page', page.pageNumber); return ''; }
+      ocrToast('Page ' + page.pageNumber + ' has no text layer - reading it with OCR (can take ~20s)...');
+      try {
+        const vp0 = page.getViewport({ scale: 1 });
+        const scale = Math.min(5.5, 4400 / Math.max(vp0.width, vp0.height));   // ~400 dpi
+        const vp = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+        eraseGridLines(canvas);
+        if (!__ocrWorkerPromise) {
+          __ocrWorkerPromise = (async () => {
+            const wk = await Tesseract.createWorker('eng');
+            await wk.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' });
+            return wk;
+          })();
+        }
+        const worker = await __ocrWorkerPromise;
+        const { data } = await worker.recognize(canvas);
+        ocrToast('');
+        return (data.text || '').trim();
+      } catch (e) {
+        console.error('OCR failed for page', page.pageNumber, e);
+        ocrToast('OCR failed for page ' + page.pageNumber + ' - check internet connection');
+        setTimeout(() => ocrToast(''), 6000);
+        return '';
+      }
+    }
+    function pageLooksEmpty(txt) { return (txt || '').replace(/\s/g, '').length < 40; }
 
     function extractMonthFromFileName(fileName) {
       for (const month of MONTH_NAMES) {
@@ -966,6 +1049,8 @@
       document.getElementById('metaMonth').textContent = detectedMonth;
       document.getElementById('metaYear').textContent = currentYear;
 
+      const __pdfKey = pdfFileInput.name + '|' + pdfFileInput.size + '|' + pdfFileInput.lastModified;
+      if (window.__lastPageMapKey !== __pdfKey) { window.__lastPageMap = null; window.__lastPageMapKey = __pdfKey; }
       let pageMap = window.__lastPageMap;
       if (!pageMap) {
         const masterPdfBuffer = await pdfFileInput.arrayBuffer();
@@ -986,6 +1071,7 @@
             .sort((a, b) => b - a) 
             .map(y => lines[y].sort((a, b) => a.x - b.x).map(obj => obj.text).join(' '))
             .join('\n'); 
+          if (pageLooksEmpty(pageText)) pageText = await ocrPdfPage(page);
           pageMap.push({ pageNum: i, text: pageText });
         }
         window.__lastPageMap = pageMap; 
@@ -998,16 +1084,16 @@
       reportState = [];
 
       WORD_DOC_STAFF_LIST.forEach((staff, si) => {
-        const bestMatch = findBestMatchingPage(staff.name, pageMap);
+        const bestMatch = findBestMatchingPage(staff.name, pageMap, staff.empNo);
         const matchedPage = bestMatch ? bestMatch.page : null;
         let parsedLeaves = matchedPage ? parseABLeavesFromText(matchedPage.text, currentYear, detectedMonth) : [];
 
         debugBlocks.push(
           `=== ${staff.name} (${staff.empNo}) ===\n` +
           (matchedPage
-            ? `Matched Page: ${matchedPage.pageNum}\nPage's EMP ID Name: ${bestMatch.empName}  (similarity: ${(bestMatch.score * 100).toFixed(1)}%)\n\n--- RAW LINE-BY-LINE TEXT ---\n${matchedPage.text}\n\n--- PARSED LEAVES ---\n` +
+            ? `Matched Page: ${matchedPage.pageNum}\nPage's EMP ID Name: ${bestMatch.empName}  (matched via ${bestMatch.via}, similarity: ${(bestMatch.score * 100).toFixed(1)}%)\n\n--- RAW LINE-BY-LINE TEXT ---\n${matchedPage.text}\n\n--- PARSED LEAVES ---\n` +
               (parsedLeaves.length ? parsedLeaves.map(l => `From: ${l.from}  To: ${l.to}  Days: ${l.count}`).join('\n') : '(none found)')
-            : `NO MATCHING PAGE FOUND for this staff name in the PDF (below ${(NAME_MATCH_THRESHOLD * 100).toFixed(0)}% similarity threshold).`) +
+            : `NO MATCHING PAGE FOUND for this staff name in the PDF (below ${(NAME_MATCH_THRESHOLD * 100).toFixed(0)}% similarity threshold).\nClosest pages: ${closestPages(staff.name, pageMap).map(c => 'p' + c.pageNum + ' "' + c.empName + '" (' + (c.score*100).toFixed(0) + '%)').join(' | ')}`) +
           `\n`
         );
 
@@ -1192,8 +1278,15 @@
       return name.toLowerCase().replace(/\b(mr|mrs|ms|dr)\.?\b/g, '').replace(/[^a-z\s]/g, ' ').trim().split(/\s+/).filter(Boolean).sort().join(' ');
     }
     function extractEmpNameFromPage(pdfText) {
-      const m = pdfText.match(/EMP\s*ID\s*:\s*\S+\s*-\s*(.+)/i);
-      return m ? m[1].split('\n')[0].trim() : null;
+      // Name may sit on the same line as "EMP ID : 07651 - NAME", or be pushed to the next line
+      let m = pdfText.match(/EMP\s*ID\s*:?\s*[0-9A-Za-z\/]*\s*[-\u2013:]\s*([^\n]+)/i);
+      if (m && m[1].trim().length > 1) return m[1].trim();
+      m = pdfText.match(/EMP\s*ID\s*:?\s*[0-9A-Za-z\/]*\s*\n\s*([^\n]+)/i);
+      return m ? m[1].trim() : null;
+    }
+    function extractEmpIdFromPage(pdfText) {
+      const m = pdfText.match(/EMP\s*ID\s*:?\s*0*([0-9]+)/i);
+      return m ? m[1] : null;
     }
     function levenshtein(a, b) {
       const m = a.length, n = b.length;
@@ -1218,17 +1311,58 @@
       const maxLen = Math.max(na.length, nb.length);
       return maxLen === 0 ? 1 : 1 - (dist / maxLen);
     }
-    const NAME_MATCH_THRESHOLD = 0.72; 
-    function findBestMatchingPage(staffFullName, pageMap) {
+    const NAME_MATCH_THRESHOLD = 0.72;
+    function nameTokens(name) {
+      return name.toLowerCase().replace(/\b(mr|mrs|ms|dr|miss)\b\.?/g, ' ').replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(Boolean);
+    }
+    // Token-by-token fuzzy score. Handles: reordered names, spelling variants
+    // (Punniymoorthy / Punniyamoorthy), initials (P. Mayuran), missing/extra words.
+    function tokenNameScore(nameA, nameB) {
+      const a = nameTokens(nameA), b = nameTokens(nameB);
+      if (!a.length || !b.length) return 0;
+      const [small, big] = a.length <= b.length ? [a, b] : [b, a];
+      let total = 0;
+      small.forEach(t => {
+        let best = 0;
+        big.forEach(u => {
+          let sc;
+          if (t.length === 1 || u.length === 1) sc = (t[0] === u[0]) ? 0.8 : 0;
+          else sc = 1 - levenshtein(t, u) / Math.max(t.length, u.length);
+          if (sc > best) best = sc;
+        });
+        total += best;
+      });
+      return total / small.length;
+    }
+    function combinedNameScore(a, b) { return Math.max(nameSimilarity(a, b), tokenNameScore(a, b)); }
+
+    // Order of trust: (1) EMP ID number, (2) name on the "EMP ID" line, (3) name words anywhere on the page.
+    function findBestMatchingPage(staffFullName, pageMap, empNo) {
+      const wantId = empNo && /[1-9]/.test(String(empNo)) ? String(empNo).replace(/^0+/, '') : null;
       let best = null;
       for (const p of pageMap) {
         const empName = extractEmpNameFromPage(p.text);
-        if (!empName) continue;
-        const score = nameSimilarity(staffFullName, empName);
-        if (!best || score > best.score) best = { page: p, empName, score };
+        let score = 0, via = 'name';
+        if (wantId && extractEmpIdFromPage(p.text) === wantId) { score = 1; via = 'EMP ID'; }
+        else {
+          if (empName) score = combinedNameScore(staffFullName, empName);
+          if (score < NAME_MATCH_THRESHOLD) {
+            const flat = p.text.toLowerCase().replace(/[^a-z]/g, '');
+            const toks = nameTokens(staffFullName).filter(t => t.length > 1);
+            if (toks.length && toks.every(t => flat.includes(t))) { score = Math.max(score, 0.9); via = 'name on page'; }
+          }
+        }
+        if (!best || score > best.score) best = { page: p, empName: empName || '(not found)', score, via };
       }
       if (best && best.score >= NAME_MATCH_THRESHOLD) return best;
       return null;
+    }
+    // Diagnostics: closest 3 pages when nothing matched
+    function closestPages(staffFullName, pageMap) {
+      return pageMap.map(p => {
+        const n = extractEmpNameFromPage(p.text) || '(no EMP ID line)';
+        return { pageNum: p.pageNum, empName: n, score: combinedNameScore(staffFullName, n) };
+      }).sort((x, y) => y.score - x.score).slice(0, 3);
     }
 
     function parseABLeavesFromText(pdfText, year, monthStr) {
@@ -1390,6 +1524,8 @@
       document.getElementById('metaAcademicMonth').textContent = detectedMonth;
       document.getElementById('metaAcademicYear').textContent = currentYear;
 
+      const __pdfKey = pdfFileInput.name + '|' + pdfFileInput.size + '|' + pdfFileInput.lastModified;
+      if (window.__lastPageMapKey !== __pdfKey) { window.__lastPageMap = null; window.__lastPageMapKey = __pdfKey; }
       let pageMap = window.__lastPageMap;
       if (!pageMap) {
         const masterPdfBuffer = await pdfFileInput.arrayBuffer();
@@ -1410,6 +1546,7 @@
             .sort((a, b) => b - a) 
             .map(y => lines[y].sort((a, b) => a.x - b.x).map(obj => obj.text).join(' '))
             .join('\n'); 
+          if (pageLooksEmpty(pageText)) pageText = await ocrPdfPage(page);
           pageMap.push({ pageNum: i, text: pageText });
         }
         window.__lastPageMap = pageMap;
@@ -1652,6 +1789,8 @@
       document.getElementById('metaTempMonth').textContent = detectedMonth;
       document.getElementById('metaTempYear').textContent = currentYear;
 
+      const __pdfKey = pdfFileInput.name + '|' + pdfFileInput.size + '|' + pdfFileInput.lastModified;
+      if (window.__lastPageMapKey !== __pdfKey) { window.__lastPageMap = null; window.__lastPageMapKey = __pdfKey; }
       let pageMap = window.__lastPageMap;
       if (!pageMap) {
         const masterPdfBuffer = await pdfFileInput.arrayBuffer();
@@ -1672,6 +1811,7 @@
             .sort((a, b) => b - a) 
             .map(y => lines[y].sort((a, b) => a.x - b.x).map(obj => obj.text).join(' '))
             .join('\n'); 
+          if (pageLooksEmpty(pageText)) pageText = await ocrPdfPage(page);
           pageMap.push({ pageNum: i, text: pageText });
         }
         window.__lastPageMap = pageMap; 
