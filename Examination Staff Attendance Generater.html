@@ -287,6 +287,39 @@
             width: 200px;
             border-bottom: 1px dotted #000;
         }
+
+        /* ===== Section 1: Staff management (screen only) ===== */
+        .section-card {
+            max-width: 850px;
+            margin: 0 auto 25px auto;
+            background: #fff;
+            padding: 25px 30px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+            font-size: 10.5pt;
+        }
+        .section-card h2 { margin: 0 0 4px 0; font-size: 15pt; color: #003366; }
+        .section-card h3 { margin: 22px 0 8px 0; font-size: 12pt; color: #003366; }
+        .section-note { margin: 0 0 10px 0; color: #555; font-size: 9.5pt; }
+        .section-title-2 { max-width: 850px; margin: 0 auto 10px auto; font-family: Arial, sans-serif; color: #003366; }
+        .section-title-2 h2 { margin: 0; font-size: 15pt; }
+        table.mgmt-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        table.mgmt-table th, table.mgmt-table td { border: 1px solid #bbb; padding: 5px 8px; text-align: left; font-size: 10pt; }
+        table.mgmt-table th { background: #e6edf5; }
+        table.mgmt-table td.c-no { width: 40px; text-align: center; }
+        table.mgmt-table td.c-act { width: 80px; text-align: center; }
+        .btn-del { background: #b3261e; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 9.5pt; }
+        .btn-del:hover { background: #8c1d18; }
+        .add-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 4px; }
+        .add-row input { padding: 6px 8px; border: 1px solid #aaa; border-radius: 4px; font-size: 10pt; font-family: Arial, sans-serif; }
+        .add-row input.in-name { flex: 2; min-width: 180px; }
+        .add-row input.in-nic { flex: 1; min-width: 120px; }
+        .add-row input.in-des { flex: 2; min-width: 180px; }
+        .msg { font-size: 9.5pt; min-height: 1.2em; margin-top: 4px; }
+        .msg.err { color: #b3261e; }
+        .msg.ok { color: #1b7a34; }
     </style>
 </head>
 <body>
@@ -296,6 +329,40 @@
         <button class="btn" onclick="window.print()">Print / Save PDF</button>
 		<p align='right'> <a href='index.html'> Home </a></p>
     </div>
+
+    <!-- ===== SECTION 1: STAFF MANAGEMENT ===== -->
+    <div class="section-card no-print">
+        <h2>Section 1 – Staff Management</h2>
+        <p class="section-note">Add or delete members. Changes are saved in this browser and used the next time you open this page.</p>
+
+        <h3>Academic Staff Supervisors (<span id="sup-count">0</span>)</h3>
+        <table class="mgmt-table">
+            <thead><tr><th>No</th><th>Name</th><th>N.I.C No</th><th>Action</th></tr></thead>
+            <tbody id="sup-tbody"></tbody>
+        </table>
+        <div class="add-row">
+            <input type="text" id="sup-name" class="in-name" placeholder="Name (e.g. Mr. A. Kumar)">
+            <input type="text" id="sup-nic" class="in-nic" placeholder="N.I.C No">
+            <button class="btn" onclick="addSupervisor()">Add Supervisor</button>
+        </div>
+        <div class="msg" id="sup-msg"></div>
+
+        <h3>Staff (Technical Officers / Lab Attendants / Instructors) (<span id="staff-count">0</span>)</h3>
+        <table class="mgmt-table">
+            <thead><tr><th>No</th><th>Name</th><th>N.I.C No</th><th>Designation</th><th>Action</th></tr></thead>
+            <tbody id="staff-tbody"></tbody>
+        </table>
+        <div class="add-row">
+            <input type="text" id="staff-name" class="in-name" placeholder="Name (e.g. Mr. A. Kumar)">
+            <input type="text" id="staff-nic" class="in-nic" placeholder="N.I.C No">
+            <input type="text" id="staff-des" class="in-des" placeholder="Designation (e.g. Temporary Instructor)">
+            <button class="btn" onclick="addStaff()">Add Staff</button>
+        </div>
+        <div class="msg" id="staff-msg"></div>
+    </div>
+
+    <!-- ===== SECTION 2: ATTENDANCE ===== -->
+    <div class="section-title-2 no-print"><h2>Section 2 – Attendance Table</h2></div>
 
     <div class="document-container">
        
@@ -400,7 +467,7 @@
     </div>
 
     <script>
-        const academicStaffSupervisors = [
+        const defaultSupervisors = [
             { name: "Mr. Kaneshanathan Ananthakrishnan", nic: "741492547V" },
             { name: "Ms. Pavalarani Balendren", nic: "197162702109" },
             { name: "Ms. Surendranathan Varnarubiny", nic: "757151774V" },
@@ -419,7 +486,7 @@
             { name: "Mr. Y. Achchuthan", nic: "900733550V" }
         ];
 
-        const staffData = [
+        const defaultStaff = [
             { name: "Mr. Arasanayagam Jeyakanth", nic: "882910970V", designation: "Technical Officer, Staff Technical Officer, Gr.II" },
             { name: "Mr. Arumainayagam Kokulan", nic: "911501929V", designation: "Technical Officer, Gr. II, Sec A" },
             { name: "Mr. Suppaiah Suthakaran", nic: "198223103850", designation: "Laboratory Attendant, Gr. III" },
@@ -441,6 +508,158 @@
             { name: "Mr. Dominic Xavidhar Diron De Mel", nic: "993061166V", designation: "Temporary Instructor" },
             { name: "Mr. Thevarajan Jeevathuvarakan", nic: "200036300345", designation: "Temporary Instructor" }
         ];
+
+        // ===== Persistence =====
+        const STORE_SUP = 'examAttendance.supervisors.v1';
+        const STORE_STAFF = 'examAttendance.staff.v1';
+
+        function loadList(key, fallback) {
+            try {
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) return parsed;
+                }
+            } catch (e) { /* storage unavailable or corrupt: use defaults */ }
+            return fallback.map(x => ({ ...x }));
+        }
+
+        function saveList(key, list) {
+            try { localStorage.setItem(key, JSON.stringify(list)); }
+            catch (e) { console.warn('Could not save', e); }
+        }
+
+        let academicStaffSupervisors = loadList(STORE_SUP, defaultSupervisors);
+        let staffData = loadList(STORE_STAFF, defaultStaff);
+
+        // ===== Section 1: management =====
+        function setMsg(id, text, ok) {
+            const el = document.getElementById(id);
+            el.textContent = text;
+            el.className = 'msg ' + (ok ? 'ok' : 'err');
+        }
+
+        function normNic(v) { return v.trim().toUpperCase(); }
+
+        function nicExists(nic) {
+            return academicStaffSupervisors.some(s => normNic(s.nic) === nic) ||
+                   staffData.some(s => normNic(s.nic) === nic);
+        }
+
+        function renderManagement() {
+            const supBody = document.getElementById('sup-tbody');
+            supBody.innerHTML = '';
+            academicStaffSupervisors.forEach((s, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = '<td class="c-no"></td><td></td><td></td><td class="c-act"></td>';
+                tr.children[0].textContent = i + 1;
+                tr.children[1].textContent = s.name;
+                tr.children[2].textContent = s.nic;
+                const b = document.createElement('button');
+                b.className = 'btn-del'; b.textContent = 'Delete';
+                b.onclick = () => deleteSupervisor(i);
+                tr.children[3].appendChild(b);
+                supBody.appendChild(tr);
+            });
+            document.getElementById('sup-count').textContent = academicStaffSupervisors.length;
+
+            const stBody = document.getElementById('staff-tbody');
+            stBody.innerHTML = '';
+            staffData.forEach((s, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = '<td class="c-no"></td><td></td><td></td><td></td><td class="c-act"></td>';
+                tr.children[0].textContent = i + 1;
+                tr.children[1].textContent = s.name;
+                tr.children[2].textContent = s.nic;
+                tr.children[3].textContent = s.designation;
+                const b = document.createElement('button');
+                b.className = 'btn-del'; b.textContent = 'Delete';
+                b.onclick = () => deleteStaff(i);
+                tr.children[4].appendChild(b);
+                stBody.appendChild(tr);
+            });
+            document.getElementById('staff-count').textContent = staffData.length;
+        }
+
+        function addSupervisor() {
+            const name = document.getElementById('sup-name').value.trim();
+            const nic = document.getElementById('sup-nic').value.trim();
+            if (!name || !nic) { setMsg('sup-msg', 'Please enter both name and N.I.C No.', false); return; }
+            if (nicExists(normNic(nic))) { setMsg('sup-msg', 'This N.I.C No already exists in the lists.', false); return; }
+            academicStaffSupervisors.push({ name, nic });
+            saveList(STORE_SUP, academicStaffSupervisors);
+            document.getElementById('sup-name').value = '';
+            document.getElementById('sup-nic').value = '';
+            renderManagement();
+            refreshSupervisorOptions();
+            setMsg('sup-msg', 'Supervisor added and saved.', true);
+        }
+
+        function deleteSupervisor(i) {
+            const s = academicStaffSupervisors[i];
+            if (!confirm('Delete supervisor "' + s.name + '"?')) return;
+            academicStaffSupervisors.splice(i, 1);
+            saveList(STORE_SUP, academicStaffSupervisors);
+            renderManagement();
+            refreshSupervisorOptions();
+            setMsg('sup-msg', 'Supervisor deleted and saved.', true);
+        }
+
+        function addStaff() {
+            const name = document.getElementById('staff-name').value.trim();
+            const nic = document.getElementById('staff-nic').value.trim();
+            const designation = document.getElementById('staff-des').value.trim();
+            if (!name || !nic || !designation) { setMsg('staff-msg', 'Please enter name, N.I.C No and designation.', false); return; }
+            if (nicExists(normNic(nic))) { setMsg('staff-msg', 'This N.I.C No already exists in the lists.', false); return; }
+            staffData.push({ name, nic, designation });
+            saveList(STORE_STAFF, staffData);
+            document.getElementById('staff-name').value = '';
+            document.getElementById('staff-nic').value = '';
+            document.getElementById('staff-des').value = '';
+            renderManagement();
+            refreshNameOptions();
+            setMsg('staff-msg', 'Staff member added and saved.', true);
+        }
+
+        function deleteStaff(i) {
+            const s = staffData[i];
+            if (!confirm('Delete staff member "' + s.name + '"?')) return;
+            staffData.splice(i, 1);
+            saveList(STORE_STAFF, staffData);
+            renderManagement();
+            refreshNameOptions();
+            setMsg('staff-msg', 'Staff member deleted and saved.', true);
+        }
+
+        // Rebuild dropdown options in Section 2 without losing current choices
+        function refreshSupervisorOptions() {
+            const sel = document.getElementById('supervisor-select');
+            const current = sel.value;
+            initSupervisors();
+            if ([...sel.options].some(o => o.value === current)) sel.value = current;
+        }
+
+        function refreshNameOptions() {
+            document.querySelectorAll('select.select-name').forEach(select => {
+                const current = select.value;
+                const rowIndex = select.dataset.rowIndex;
+                select.innerHTML = '';
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = ''; defaultOpt.textContent = '';
+                select.appendChild(defaultOpt);
+                staffData.forEach(staff => {
+                    const opt = document.createElement('option');
+                    opt.value = staff.name; opt.textContent = staff.name;
+                    select.appendChild(opt);
+                });
+                if (current && staffData.some(s => s.name === current)) {
+                    select.value = current;
+                } else if (current) {
+                    select.value = '';
+                    onNameChange(select, rowIndex); // clears NIC / dept / role of deleted person
+                }
+            });
+        }
 
         function formatDateToDDMMYYYY(isoDateString) {
             if (!isoDateString) return "";
@@ -581,6 +800,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            renderManagement();
             initSupervisors();
             initTableRows();
         });
